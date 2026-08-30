@@ -1,0 +1,6 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+# 调试用临时文件（截图、日志、辅助脚本）
+/tmp_*

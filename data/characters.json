@@ -1,0 +1,17 @@
+{
+	"yf": {
+		"name": "伊芙",
+		"color": "#6b5445",
+		"letter_bg": "res://assets/background/letter_background/letter_bg_yf.png",
+		"header": "res://assets/header/header_yf_2.png",
+		"header_locked": "res://assets/header/header_yf_0.png"
+	},
+	
+	"qyy": {
+		"name": "仇有余",
+		"color": "#515517",
+		"letter_bg": "res://assets/background/letter_background/letter_bg_qyy.png",
+		"header": "res://assets/header/header_qyy_2.png",
+		"header_locked": "res://assets/header/header_qyy_0.png"
+	}
+}

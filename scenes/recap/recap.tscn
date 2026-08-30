@@ -1,0 +1,200 @@
+[gd_scene format=3 uid="uid://uow1okuhhi1e"]
+
+[ext_resource type="Script" uid="uid://bhsmynxjf1dde" path="res://scenes/recap/recap.gd" id="1_recap"]
+[ext_resource type="FontFile" uid="uid://dlf6q22ilx5kk" path="res://assets/fonts/HYRunYuan-55W.ttf" id="2_font"]
+[ext_resource type="Texture2D" uid="uid://dklplm6n3wxqp" path="res://assets/button/button_general_red.png" id="3_red"]
+[ext_resource type="Texture2D" uid="uid://csumk0q8ttcxo" path="res://assets/button/button_general_red_pressed.png" id="4_redp"]
+[ext_resource type="Texture2D" uid="uid://dyfxrqpywxpg5" path="res://assets/button/button_general_light.png" id="5_light"]
+[ext_resource type="Texture2D" uid="uid://bu4raplt2xol7" path="res://assets/button/button_general_light_pressed.png" id="6_lightp"]
+[ext_resource type="Texture2D" uid="uid://bc8xj8wbd7jfn" path="res://assets/button/button_general_dark_pressed.png" id="7_dark"]
+
+[node name="Recap" type="Control" unique_id=255250050]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_recap")
+
+[node name="Shade" type="ColorRect" parent="." unique_id=827004698]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.08, 0.09, 0.12, 1)
+
+[node name="Bg" type="TextureRect" parent="." unique_id=1472981771]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="LetterScroll" type="ScrollContainer" parent="." unique_id=1250644943]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.0849
+anchor_right = 0.9885
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+
+[node name="DragCatcher" type="Control" parent="." unique_id=2110940411]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="EdgeButtons" type="Control" parent="." unique_id=2060028711]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="StartButton" type="TextureButton" parent="EdgeButtons" unique_id=1598336897]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -304.99988
+offset_top = 144.00005
+offset_right = 97.00012
+offset_bottom = 252.00005
+grow_horizontal = 0
+rotation = -0.2617994
+scale = Vector2(0.95, 0.95)
+texture_normal = ExtResource("3_red")
+texture_pressed = ExtResource("4_redp")
+
+[node name="Label" type="Label" parent="EdgeButtons/StartButton" unique_id=1173072615]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -23.186132
+offset_top = -2.9434128
+offset_right = -23.186127
+offset_bottom = -2.9434128
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(0.95, 0.95)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 40
+text = "开始！"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="OtherButton" type="TextureButton" parent="EdgeButtons" unique_id=417460779]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -294.0
+offset_top = 266.00003
+offset_right = 108.0
+offset_bottom = 374.00003
+grow_horizontal = 0
+rotation = -0.2617994
+scale = Vector2(0.95, 0.95)
+texture_normal = ExtResource("5_light")
+texture_pressed = ExtResource("6_lightp")
+
+[node name="Label" type="Label" parent="EdgeButtons/OtherButton" unique_id=137719061]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -60.75295
+offset_top = -1.0220377
+offset_right = -60.75296
+offset_bottom = -1.0220413
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.1, 0.1, 0.16, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 40
+text = "另一封"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RecallButton" type="TextureButton" parent="EdgeButtons" unique_id=1550878294]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -294.0
+offset_top = 764.0001
+offset_right = 108.0
+offset_bottom = 872.0001
+grow_horizontal = 0
+rotation = -0.2617994
+scale = Vector2(0.95, 0.95)
+texture_normal = ExtResource("5_light")
+texture_pressed = ExtResource("6_lightp")
+
+[node name="Label" type="Label" parent="EdgeButtons/RecallButton" unique_id=789407831]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -49.223076
+offset_top = -3.3815389
+offset_right = -49.223083
+offset_bottom = -3.3815384
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.1, 0.1, 0.16, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 40
+text = "回想"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BackButton" type="TextureButton" parent="EdgeButtons" unique_id=634105326]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -294.0
+offset_top = 891.0001
+offset_right = 108.0
+offset_bottom = 999.0001
+grow_horizontal = 0
+rotation = -0.2617994
+scale = Vector2(0.95, 0.95)
+texture_normal = ExtResource("7_dark")
+texture_pressed = ExtResource("7_dark")
+
+[node name="Label" type="Label" parent="EdgeButtons/BackButton" unique_id=966450303]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -39.52732
+offset_top = -2.963097
+offset_right = -39.527313
+offset_bottom = -2.9630966
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_fonts/font = ExtResource("2_font")
+theme_override_font_sizes/font_size = 40
+text = "返回"
+horizontal_alignment = 1
+vertical_alignment = 1

@@ -1,0 +1,195 @@
+[gd_scene format=3 uid="uid://bquol2s6orkai"]
+
+[ext_resource type="Script" uid="uid://dd2uyvstpi7q0" path="res://scenes/arrange/arrange_board.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://dyqj6gdy56jqu" path="res://scenes/arrange/drop_column.gd" id="2_col"]
+[ext_resource type="PackedScene" path="res://scenes/arrange/dual_bg.tscn" id="11_dualbg"]
+[ext_resource type="Texture2D" uid="uid://dklplm6n3wxqp" path="res://assets/button/button_general_red.png" id="4_red"]
+[ext_resource type="Texture2D" uid="uid://csumk0q8ttcxo" path="res://assets/button/button_general_red_pressed.png" id="5_redp"]
+[ext_resource type="Texture2D" uid="uid://dyfxrqpywxpg5" path="res://assets/button/button_general_light.png" id="6_light"]
+[ext_resource type="Texture2D" uid="uid://bu4raplt2xol7" path="res://assets/button/button_general_light_pressed.png" id="7_lightp"]
+[ext_resource type="Texture2D" uid="uid://bc8xj8wbd7jfn" path="res://assets/button/button_general_dark_pressed.png" id="8_dark"]
+
+[node name="Main" type="Control" unique_id=1702357096]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="DualBG" parent="." instance=ExtResource("11_dualbg")]
+
+[node name="SingleBG" type="TextureRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BoardScroll" type="ScrollContainer" parent="." unique_id=200818647]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+horizontal_scroll_mode = 0
+
+[node name="Board" type="Control" parent="BoardScroll" unique_id=483561029]
+custom_minimum_size = Vector2(1920, 1080)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LeftColumn" type="VBoxContainer" parent="BoardScroll/Board" unique_id=2088647175]
+layout_mode = 0
+offset_left = 360.0
+offset_top = 85.0
+offset_right = 910.0
+offset_bottom = 1055.0
+theme_override_constants/separation = 30
+script = ExtResource("2_col")
+
+[node name="RightColumn" type="VBoxContainer" parent="BoardScroll/Board" unique_id=843372949]
+layout_mode = 0
+offset_left = 1010.0
+offset_top = 85.0
+offset_right = 1560.0
+offset_bottom = 1055.0
+theme_override_constants/separation = 30
+script = ExtResource("2_col")
+
+[node name="EdgeButtons" type="Control" parent="." unique_id=910457555]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -12.0
+offset_right = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="DecideButton" type="TextureButton" parent="EdgeButtons" unique_id=394864762]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -294.0
+offset_top = 372.0
+offset_right = 108.0
+offset_bottom = 480.0
+grow_horizontal = 0
+rotation = -0.2617994
+texture_normal = ExtResource("4_red")
+texture_pressed = ExtResource("5_redp")
+
+[node name="DecideLabel" type="Label" parent="EdgeButtons/DecideButton" unique_id=801823466]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.036000002
+anchor_top = -0.061000004
+anchor_right = 0.814
+anchor_bottom = 0.93900007
+offset_left = -63.614105
+offset_top = 0.6673465
+offset_right = 25.629913
+offset_bottom = 0.6673355
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 40
+text = "决定"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ResetButton" type="TextureButton" parent="EdgeButtons" unique_id=1125188498]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -291.99988
+offset_top = 651.0
+offset_right = 110.00012
+offset_bottom = 759.0
+grow_horizontal = 0
+rotation = -0.2617994
+texture_normal = ExtResource("6_light")
+texture_pressed = ExtResource("7_lightp")
+
+[node name="ResetLabel" type="Label" parent="EdgeButtons/ResetButton" unique_id=805327907]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.040000003
+anchor_right = 0.81200004
+anchor_bottom = 1.0
+offset_left = -60.13364
+offset_top = -5.592542
+offset_right = 31.522339
+offset_bottom = -5.5925446
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.1, 0.1, 0.16, 1)
+theme_override_font_sizes/font_size = 40
+text = "原始状态"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BackButton" type="TextureButton" parent="EdgeButtons" unique_id=291500272]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -285.0
+offset_top = 933.0
+offset_right = 117.0
+offset_bottom = 1041.0
+grow_horizontal = 0
+rotation = -0.2617994
+texture_normal = ExtResource("8_dark")
+texture_pressed = ExtResource("8_dark")
+
+[node name="BackLabel" type="Label" parent="EdgeButtons/BackButton" unique_id=1369349707]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.051000003
+anchor_right = 0.83300006
+anchor_bottom = 0.76100004
+offset_left = -70.42056
+offset_top = -3.0228753
+offset_right = 17.215424
+offset_bottom = 22.789124
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 40
+text = "返回"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RankTag" type="TextureRect" parent="." unique_id=747621419]
+visible = false
+layout_mode = 0
+offset_left = 150.0
+offset_top = 860.0
+offset_right = 508.0
+offset_bottom = 1019.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ResultLabel" type="Label" parent="." unique_id=1452253232]
+layout_mode = 0
+offset_left = 184.0
+offset_top = 1032.0
+offset_right = 504.0
+offset_bottom = 1092.0
+theme_override_colors/font_color = Color(1, 0.95, 0.8, 1)
+theme_override_font_sizes/font_size = 16
+text = "（尚未执行）"
+autowrap_mode = 3

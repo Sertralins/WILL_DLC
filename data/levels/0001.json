@@ -1,0 +1,52 @@
+{
+	"level_id": "0001",
+	"title": "0001",
+	"subtitle": "",
+	"row_count": 2,
+	"unlock": "",
+	"rows": [
+		{
+			"id": "L",
+			"title": "心电感应",
+			"monologue": "什么时候才能静下来",
+			"character": "yf",
+			"position": "0,3",
+			"previous": "start",
+			"blocks": [
+				{ "id": "PanelA1", "text_key": "0001_PanelA1" },
+				{ "id": "PanelA2", "text_key": "0001_PanelA2" }
+			],
+			"strips": [
+				{ "id": "A1", "text_key": "0001_A1" },
+				{ "id": "A2", "text_key": "0001_A2" }
+			],
+			"variants": []
+		},
+		{
+			"id": "R",
+			"title": "昨日死别",
+			"monologue": "我恨透了不公平的人生",
+			"character": "qyy",
+			"position": "-2,5",
+			"previous": "start",
+			"blocks": [
+				{ "id": "PanelB1", "text_key": "0001_PanelB1" },
+				{ "id": "PanelB2", "text_key": "0001_PanelB2" }
+			],
+			"strips": [
+				{ "id": "B1", "text_key": "0001_B1" }
+			],
+			"variants": [
+				{ "id": "PanelB2_1", "base": "PanelB2", "text_key": "0001_PanelB2_1" }
+			]
+		}
+	],
+	"endings": {
+		"S1":   { "rank": "S",   "rep": 325, "change": [ { "type": "REPLACE", "data": "PanelB2_1" } ] },
+		"BAD1": { "rank": "Bad", "rep": 0,   "change": [] }
+	},
+	"conditions": [
+		{ "expr": "SS(A2,A1)", "ending": "S1" },
+		{ "expr": "", "ending": "BAD1", "fallback": true }
+	]
+}
