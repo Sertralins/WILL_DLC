@@ -17,15 +17,18 @@ extends Node2D
 const HEADER_W := 444.0
 const HEADER_H := 132.0
 const UNIT_Y := 80.0             # 距离坐标 1 单位 = 80px(生长轴, 纵向)
+const GX := 222.0                # 手动栅格横向 1 格 = 半列宽(偶数 gx = 角色列轴线)
 const BASE_GAP := 60.0           # 头像底边到首格网格线的基准留白
 const BLOCK := 70.0              # 关卡块尺寸(外框与填充齐平)
-const LINE_W := 10.0             # 连线线宽(原版 10px)
+const LINE_W := 10.0             # 连线线宽(原版 10px; 素材管件自带笔触, 此常量仅作参考)
 const BG_COLOR := Color("f7f6ee")
 const RUNG_COLOR := Color("d64545")  # 剧情关联横线(红色实线)
 const MAP_COLS := 8              # 大地图预留人物列数(>= 当前角色数, 未来可加)
 const MAP_ROWS := 60             # 大地图纵向刻度数
 const ZOOM_MIN := 0.45
 const ZOOM_MAX := 1.5
+
+const ROUTE := preload("res://scenes/map/map_route.gd")   # 素材管件连线节点
 
 # 块下细节卡(仿原版 A.png): 深棕圆角框, 上白底关卡名, 下灰底结局方块
 const CARD_W := 300.0
@@ -39,6 +42,7 @@ var world: Node2D                # 栅格/连线/块层(随相机缩放平移)
 var surface: ColorRect           # 大地图白底表面(选中淡化蒙版用)
 var grid_layer: Node2D
 var rails_layer: Node2D          # 角色竖直剧情线层
+var previews_layer: Node2D       # 待定虚线层(pendings, 在 rails 与 rungs 之间)
 var rungs_layer: Node2D          # 红色关联横线层
 var blocks_layer: Node2D
 var fx_layer: Node2D             # 信封等演出层(屏幕坐标)
@@ -89,6 +93,7 @@ func _ready() -> void:
 			revealed.erase(key)
 	_rebuild_rails()
 	_rebuild_rungs()
+	_rebuild_previews()
 	_build_headers()
 	_update_mailbox_flag()
 	# 初始相机: 地图中心列(首位角色)水平居中, 地图顶(头像底)贴上缘
@@ -120,6 +125,8 @@ func _build_static_ui() -> void:
 	world.add_child(grid_layer)
 	rails_layer = Node2D.new()
 	world.add_child(rails_layer)
+	previews_layer = Node2D.new()
+	world.add_child(previews_layer)
 	rungs_layer = Node2D.new()
 	rungs_layer.visible = false   # 红线平时不显示, 选中相关关卡时才亮
 	world.add_child(rungs_layer)
@@ -231,6 +238,28 @@ func _load_data() -> void:
 				"parent": row.previous,
 				"pendings": row.pendings,
 			})
+	# 手动栅格位置(levels_index.json positions): 命中 key 的节点直接定块位,
+	# 不参与自动放置与齐平下移; 未登记的节点走下面的自动布局(safety net)
+	var positions := LevelData.load_positions()
+	var manual_pos := {}   # key -> 世界坐标
+	var manual_depth := {} # key -> 深度格(供自动子树按相对深度续算)
+	var known_keys := {}
+	for r in raw_rows:
+		known_keys[String(r.key)] = true
+	for pkey in positions:
+		var k := String(pkey)
+		if not known_keys.has(k):
+			push_warning("map: positions 未知节点: %s" % k)
+			continue
+		var v = positions[pkey]
+		if not (v is Array) or v.size() != 2 or not (v[0] is int or v[0] is float) \
+				or not (v[1] is int or v[1] is float):
+			push_warning("map: positions 值非法(应为 [gx, gy]): %s = %s" % [k, str(v)])
+			continue
+		var gx := float(v[0])
+		var gy := float(v[1])
+		manual_pos[k] = Vector2(map_w * 0.5 + gx * GX, BASE_GAP + gy * UNIT_Y)
+		manual_depth[k] = gy
 	var placed := {"start": 0.0}   # key -> 累计深度(距离单位)
 	var progress := true
 	while progress:
@@ -238,6 +267,13 @@ func _load_data() -> void:
 		for r in raw_rows:
 			var key := String(r.key)
 			if nodes.has(key) or not placed.has(String(r.parent)):
+				continue
+			if manual_pos.has(key):
+				r["pos"] = manual_pos[key]
+				r["manual"] = true
+				nodes[key] = r
+				placed[key] = manual_depth[key]
+				progress = true
 				continue
 			var parts := String(r.position).split(",")
 			var dist := int(parts[1]) if parts.size() > 1 else 3
@@ -262,7 +298,8 @@ func _load_data() -> void:
 	grid.setup(xs, ys, map_h)
 	grid_layer.add_child(grid)
 
-# 同一封信的两行(L/R)水平齐平: 浅者下移到较深者的深度, 其子树整体随移
+# 同一封信的两行(L/R)水平齐平: 浅者下移到较深者的深度, 其子树整体随移;
+# 手动栅格节点(manual)是绝对锚点, 不参与对齐也不随子树平移
 func _align_level_rows() -> void:
 	var by_level := {}
 	for key in nodes:
@@ -273,13 +310,18 @@ func _align_level_rows() -> void:
 	for lid in by_level:
 		var target := 0.0
 		for key in by_level[lid]:
-			target = maxf(target, float(nodes[key].pos.y))
+			if not bool(nodes[key].get("manual", false)):
+				target = maxf(target, float(nodes[key].pos.y))
 		for key in by_level[lid]:
+			if bool(nodes[key].get("manual", false)):
+				continue
 			var delta := target - float(nodes[key].pos.y)
 			if delta > 0.5:
 				_shift_subtree(String(key), delta)
 
 func _shift_subtree(key: String, delta: float) -> void:
+	if bool(nodes[key].get("manual", false)):
+		return
 	nodes[key].pos.y += delta
 	for k2 in nodes:
 		if String(nodes[k2].parent) == key:
@@ -353,6 +395,8 @@ func _build_headers() -> void:
 		var path := String(info.get("header", "res://assets/header/header_%s_2.png" % cid))
 		if not _char_has_ending(String(cid)):
 			path = String(info.get("header_locked", "res://assets/header/header_%s_0.png" % cid))
+		if not ResourceLoader.exists(path):
+			continue   # 素材缺失(如占位角色): 头像槽不显示, 补素材后自动出现
 		var tex := TextureRect.new()
 		tex.texture = load(path)
 		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -447,15 +491,16 @@ func _pop_block(ctl: Control, delay: float) -> void:
 		tw.tween_interval(delay)
 	tw.tween_property(ctl, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 
-# —— 连线: 角色竖直剧情线 + 红色关联横线 ——
+# —— 连线: 角色竖直剧情线 + 待定虚线 + 红色关联横线 ——
+# 全部走素材管件(map_route.gd): 同列竖线/同高横线/跨列 S 弯(先竖→拐→横→拐→竖)
 
 func _make_line(from: Vector2, to: Vector2, color: Color, grow_time := 0.0, dashed := false) -> Node2D:
-	var line: Node2D = load("res://scenes/map/map_line.gd").new()
-	line.width = LINE_W
+	var line: Node2D = ROUTE.new()
 	line.setup(from, to, color, dashed, grow_time)
 	return line
 
-# 剧情线(每角色一条, 从头像底边到最深块): 读档重建用
+# 剧情线(每角色一条, 从头像底边到本列最深块): 读档重建用;
+# 手动摆到其他泳道的块不拉长本列主线(由 S 弯边承担过渡)
 func _rebuild_rails() -> void:
 	for child in rails_layer.get_children():
 		child.free()
@@ -470,9 +515,11 @@ func _rebuild_rails() -> void:
 		by_char[cid].append(nd)
 	for cid in by_char:
 		var deepest := 0.0
-		for nd in by_char[cid]:
-			deepest = maxf(deepest, float(nd.pos.y) - BLOCK * 0.5)   # 线停在最深块上缘
 		var x := _rail_x(String(cid))
+		for nd in by_char[cid]:
+			if absf(float(nd.pos.x) - x) > 0.5:
+				continue
+			deepest = maxf(deepest, float(nd.pos.y) - BLOCK * 0.5)   # 线停在最深块上缘
 		var line := _make_line(Vector2(x, 0.0), Vector2(x, deepest), _char_color(String(cid)))
 		rails_layer.add_child(line)
 		rail_head[cid] = line
@@ -510,15 +557,44 @@ func _rebuild_rungs() -> void:
 	for rel in _collect_relations():
 		var na: Dictionary = nodes[rel.a]
 		var nb: Dictionary = nodes[rel.b]
-		# 同信两块水平齐平: 红线从左块右缘连到右块左缘
-		var y: float = float(na.pos.y)
+		# 同信两块: 齐平 → 红线从左块右缘连到右块左缘(横线); 不齐 → S 弯折线
 		var left: Dictionary = na if float(na.pos.x) < float(nb.pos.x) else nb
 		var right: Dictionary = nb if left == na else na
 		var rung := _make_line(
-			Vector2(float(left.pos.x) + BLOCK * 0.5, y),
-			Vector2(float(right.pos.x) - BLOCK * 0.5, y), RUNG_COLOR)
+			Vector2(float(left.pos.x) + BLOCK * 0.5, float(left.pos.y)),
+			Vector2(float(right.pos.x) - BLOCK * 0.5, float(right.pos.y)), RUNG_COLOR)
 		rung.set_meta("rel", {"a": String(rel.a), "b": String(rel.b)})
 		rungs_layer.add_child(rung)
+
+# 待定虚线(pendings): from 已 reveal、本节点未 reveal 且评级条件满足
+# (ranks 空 = from 达成任一结局; 非空 = 含其一)→ 从 from 块底边画虚线到本块顶边
+func _rebuild_previews() -> void:
+	for child in previews_layer.get_children():
+		child.free()
+	for key in nodes:
+		if GameState.row_revealed(String(key)):
+			continue
+		var nd: Dictionary = nodes[key]
+		for p in nd.get("pendings", []):
+			var from := String(p.get("from", ""))
+			if not nodes.has(from) or not revealed.has(from):
+				continue
+			var ranks: Array = p.get("ranks", [])
+			var ok := false
+			if ranks.is_empty():
+				ok = not ranks_of(from).is_empty()
+			else:
+				for r in ranks:
+					if ranks_of(from).has(String(r)):
+						ok = true
+						break
+			if not ok:
+				continue
+			var fn: Dictionary = nodes[from]
+			var from_pt := Vector2(float(fn.pos.x), float(fn.pos.y) + BLOCK * 0.5)
+			var to_pt := Vector2(float(nd.pos.x), float(nd.pos.y) - BLOCK * 0.5)
+			var line := _make_line(from_pt, to_pt, _char_color(String(fn.char)), 0.0, true)
+			previews_layer.add_child(line)
 
 # —— 相机: 滚轮缩放(指针为锚) + 左键拖拽全向平移, 钳制在大地图内 ——
 
@@ -691,6 +767,7 @@ func _on_envelope_click(holder: Control) -> void:
 		GameState.set_row_read(String(gnd.key))
 	await get_tree().create_timer(0.6).timeout
 	_rebuild_rungs()
+	_rebuild_previews()
 	_build_headers()
 	_update_mailbox_flag()
 	busy = false
@@ -705,13 +782,21 @@ func _grow_anim(nd: Dictionary, delay: float) -> void:
 	var cid := String(nd.char)
 	var x := _rail_x(cid)
 	var new_bottom: float = float(nd.pos.y) - BLOCK * 0.5   # 线停在块上缘, 不深入块内
-	# 1) 剧情线先生长: 首次从头像底边引出, 否则从现有底端延伸(文档: 0.5s/段)
-	var from_y: float = rail_last_y.get(cid, 0.0)
-	var line := _make_line(Vector2(x, from_y), Vector2(x, maxf(from_y, new_bottom)), _char_color(cid), 0.5)
+	# 1) 连线先生长: 有父块从父块顶边引出(跨泳道自动 S 弯: 先拐横向再向下);
+	#    链根从头像底边/主线底端引出(文档: 0.5s/段)
+	var parent := String(nd.parent)
+	var start_pt := Vector2(x, 0.0)
+	if parent != "" and parent != "start" and nodes.has(parent):
+		start_pt = Vector2(float(nodes[parent].pos.x), float(nodes[parent].pos.y) - BLOCK * 0.5)
+	elif rail_last_y.has(cid):
+		start_pt = Vector2(x, float(rail_last_y[cid]))
+	var line := _make_line(start_pt, Vector2(float(nd.pos.x), new_bottom), _char_color(cid), 0.5)
 	rails_layer.add_child(line)
-	if not rail_head.has(cid):
-		rail_head[cid] = line
-	rail_last_y[cid] = maxf(from_y, new_bottom)
+	if parent == "" or parent == "start":
+		if not rail_head.has(cid):
+			rail_head[cid] = line
+	if absf(float(nd.pos.x) - x) <= 0.5:
+		rail_last_y[cid] = maxf(rail_last_y.get(cid, 0.0), new_bottom)
 	# 2) 线到后块弹出
 	_spawn_block(nd, false)
 	_pop_block(block_ctls[key], delay + 0.45)
@@ -939,11 +1024,49 @@ func _enter_level(key: String) -> void:
 	GameState.current_row = String(nd.row_id)
 	# 回顾页「开始!」判定用: 记录本次点进是否为该关卡首次进入(并落盘)
 	GameState.first_entry_level = GameState.mark_level_entered(String(nd.level_id))
-	# 已解锁过结局的关卡: 再进入直接到调换纸条(排布)环节, 不再重读信件
+	# 已解锁过结局的关卡: 再进入直接到白底锁定态(结算展示), 不再重读信件
 	if GameState.history.get(String(nd.level_id), []).size() > 0:
+		_restore_ending(key)
 		GameFlow.goto("arrange")
 		return
 	GameFlow.goto("letter")
+
+# 已有结局的关卡重进: 按存档还原最近一次判定的结果与排列快照,
+# 让 arrange 场景直接进白底锁定态(结算展示), 而不是可拖拽的交换纸条画面
+func _restore_ending(key: String) -> void:
+	var nd: Dictionary = nodes[key]
+	var lid := String(nd.level_id)
+	var lv := LevelData.load_level(lid)
+	var achieved: Array = GameState.history.get(lid, [])
+	# 当前选择结局: 本行存档条目的 current, 缺省用最近达成的结局
+	var cur := String(GameState.row(key).get("current", ""))
+	if cur == "" and not achieved.is_empty():
+		cur = String(achieved[achieved.size() - 1])
+	var e: Dictionary = lv.endings.get(cur, {})
+	# 该结局在 conditions 里的序号(结算文案「命中条件 #n」用; 查不到用 0)
+	var matched := 0
+	for i in lv.conditions.size():
+		if String(lv.conditions[i].get("ending", "")) == cur:
+			matched = i
+			break
+	GameState.verdicts = {
+		"level_id": lid,
+		"ending_id": cur,
+		"rank": String(e.get("rank", "")),
+		"rep": int(e.get("rep", 0)),
+		"matched_index": matched,
+		"changes": e.get("change", []),
+	}
+	# 排列快照: 本行存档条目里的最近一次判定排列(兼容旧档: 找不到就找本关其他行)
+	var snap: Variant = GameState.row(key).get("sequence", {})
+	if not (snap is Dictionary) or (snap as Dictionary).is_empty():
+		for k2 in nodes:
+			if String(k2) != key and String(nodes[k2].level_id) == lid:
+				snap = GameState.row(String(k2)).get("sequence", {})
+				if snap is Dictionary and not (snap as Dictionary).is_empty():
+					break
+	GameState.sequences = snap if snap is Dictionary else {}
+	GameState.sequences_level = lid if not GameState.sequences.is_empty() else ""
 
 func _close_popup() -> void:
 	_click_gen += 1   # 作废飞行中的滚动开卡
@@ -977,6 +1100,7 @@ func _set_dim(active: bool, keys: Array) -> void:
 	for c in bright_texes:
 		_dim_tw.tween_property(c, "modulate:a", 1.0, 0.1)
 	_dim_tw.tween_property(rails_layer, "modulate:a", alpha, 0.1)
+	_dim_tw.tween_property(previews_layer, "modulate:a", alpha, 0.1)
 	for k in block_ctls:
 		var ctl: Control = block_ctls[k]
 		var ta := alpha if active and not keys.has(k) else 1.0

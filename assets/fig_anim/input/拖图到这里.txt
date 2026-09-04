@@ -1,0 +1,4 @@
+把新的【透明底】PNG 序列拖到本目录下，每套动画一个子目录，例如：
+assets/fig_anim/input/my_char/xxx_00000.png ...
+然后在 Script 编辑器运行 tools/fig_anim/make_anim.gd（Ctrl+Shift+X）
+详细说明见 tools/fig_anim/README.md

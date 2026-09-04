@@ -92,11 +92,12 @@ func _build_letter() -> void:
 		l.add_theme_color_override("font_color", Color(0.816, 0.871, 0.91))  # 与读信页文字色一致
 		box.add_child(l)
 
-# 信件全文 = 当前行的初始句序(与读信页同一来源, 不应用结局 CHANGE)
+# 信件全文 = 当前行的初始句序(与读信页同一来源, 不应用结局 CHANGE);
+# 回顾页连续展示, [page] 换页标记按段落换行处理, [right] 标记剔除
 func _full_letter_text() -> String:
 	var parts: Array = []
 	for sentence: Dictionary in level.initial_sequence(row):
-		parts.append(level.sentence_text(sentence))
+		parts.append(level.sentence_text(sentence).replace("\f", "\n\n").replace(LevelData.RIGHT_MARK, ""))
 	return "\n".join(parts) if parts.size() > 0 else "（信件内容缺失）"
 
 # 「开始!」显示条件: 非(首次进入该关卡 且 阅览的是第一封信);

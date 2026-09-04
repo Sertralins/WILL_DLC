@@ -3,68 +3,82 @@ msgstr ""
 "Application: WILL_game Story Text Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 
-# 关卡 0001《黑伞》剧情文本(仿原版 strings.po 格式)
+# 关卡 0001
 # 定位: msgctxt "STRINGS.DIALOG.CONTENT.0001_<句子id>", 关卡 JSON 里的 text_key 取最后一段(如 0001_PanelA1)
-# 约定: [br] = 换行; 引号内的 \n = 段落换行; 相邻引号串自动拼接; 其余 [标签] 暂被加载器剔除
+# 约定: [br] = 换行; [page] = 强制换页(读信时从新的一页开始); [right] = 该行右对齐(如落款); 引号内的 
+ = 段落换行; 相邻引号串自动拼接; 其余 [标签] 暂被加载器剔除
+
+msgctxt "STRINGS.DIALOG.CONTENT.0001_Panel0_1"
+msgid ""
+msgstr 
+"我又坐上了那趟列车。[br]\n"
+"兜兜转转的七年，密密麻麻的日夜，侵蚀着我孱弱的神经。[br]\n"
+"像拉得紧紧的弦，轻微一拨所绽放的力量，足以留下残影。[br]\n"
+"我依靠着窗边，用头抵住窗户，看着雨滴顺着玻璃向着斜后方流淌。[br][page]"
+
+"一棵棵树飞速向后飞去。[br]\n"
+"永无止境，永不停歇。[br]\n"
+"这样的景色真是令人厌烦，没有一点新意。[br]\n"
+"以至于我昏昏沉沉，好像再次坠入一个梦境。[br]\n"
+"那就再睡会吧。晚安。[br][page]"
+
+"我不知道我能为这场战争做些什么。[br]\n"
+"人命在他们手中像是蛹动的微小生物，[br]而他们需要做的只不过是肆意玩弄，然后顺手掐死。[br]\n"
+"不带有一丝人性的温暖。[br]\n"
+"我忽然感到一股恶寒，从尾椎骨深处缓缓往上爬，[br]钻入心尖的恶寒，再怎么裹紧衣服也不好使。[br]\n"
+"这充满硝烟的春天。[br][page]"
+
+"轻轻把窗往后打开一点，煤灰与尘土与我撞了个满怀，满口腔都是苦味。[br]\n"
+"还是关上窗吧。[br]\n"
+"窗外日夜迅速交替着，[br]每到一片橘黄或蔚蓝我总是分不清是早晨还是傍晚。[br]\n"
+"如果能亲手触碰天空就好了。[br][page]"
 
 msgctxt "STRINGS.DIALOG.CONTENT.0001_PanelA1"
 msgid ""
-msgstr "一场来自地狱的战争把我的青春拆得七零八落。[br]\n"
-"我又做了那个梦。在被炸成废墟的红十字医院里号哭。[br]\n"
-"尽管我今年已经17岁了。那场战争依旧摧毁着我的一切。[br]\n"
-"\n"
-"\n"
-"我是说，我想终结这场战争。[br]\n"
-"就像这样。"
+msgstr 
+"明明刚才车上是有熙熙攘攘的人群的，[br]西服点染满车厢黑黑白白，现在一溜烟的全不见了。[br]\n"
+"也许是下车了吧。[br]\n"
+"窗外依旧是倒退的树与变幻着的光影，现在到底是第几天了？[br][page]"
 
-msgctxt "STRINGS.DIALOG.CONTENT.0001_PanelA2"
+msgctxt "STRINGS.DIALOG.CONTENT.0001_Panel0_2"
 msgid ""
-msgstr "　　我冲进雨里，伞骨在狂风中嘎吱作响。[br]\n"
-"\n"
-"　　回到家时，母亲站在玄关，脸上的表情十分复杂。[br]\n"
-"\n"
-"　　那把伞……是出门时顺手带上的吗？[br]\n"
-"\n"
-"　　——故事尚未结束。"
+msgstr 
+"我走到驾驶室门前，驾驶室空无一人。[br]\n"
+"列车竟然还在开着。[br]\n"
+"我突然好想下车。[br][page]"
 
 msgctxt "STRINGS.DIALOG.CONTENT.0001_A1"
 msgid ""
-msgstr "外面下着暴雨，我出门带上了黑伞。"
+msgstr "我走到驾驶室门前，驾驶室空无一人。"
 
 msgctxt "STRINGS.DIALOG.CONTENT.0001_A2"
 msgid ""
-msgstr "我走到玄关，发现伞架上是空的。"
+msgstr "列车竟然还在开着。"
 
-msgctxt "STRINGS.DIALOG.CONTENT.0001_PanelB1"
+msgctxt "STRINGS.DIALOG.CONTENT.0001_A3"
 msgid ""
-msgstr "　　晚上八点，雨终于停了。[br]\n"
-"\n"
-"　　我打开玄关的灯，鞋架旁空空如也。[br]\n"
-"\n"
-"　　地板上有一小片水渍，一直延伸到客厅。[br]\n"
-"\n"
-"　　我愣了愣，心里泛起一丝不安。"
+msgstr "我突然好想下车。"
 
-msgctxt "STRINGS.DIALOG.CONTENT.0001_B1"
+msgctxt "STRINGS.DIALOG.CONTENT.0001_PanelA2"
 msgid ""
-msgstr "我浑身湿透了，冷得发抖。"
+msgstr 
+"他们也一起下车了？[br]\n"
+"那车上此时此刻，恐怕只有我一个人了？[br]\n"
+"战争，寒冷，孤独，思念，我流离失所。我好想哭。[br]\n"
+"我的眼泪会随着那些尘土与烟灰，卷入车底然后被抛弃吗？[br]\n"
+"不，伊芙，你不想这样。[br][br]\n"
 
-msgctxt "STRINGS.DIALOG.CONTENT.0001_PanelB2"
-msgid ""
-msgstr "　　而那把黑伞，此刻正安静地靠在我的床头。[br]\n"
-"\n"
-"　　我忽然想起，下午出门的人……真的是我吗？[br]\n"
-"\n"
-"　　墙上的时钟指向八点。[br]\n"
-"雨声，好像从来没有停过。"
+"[right]——伊芙[br]\n"
 
-msgctxt "STRINGS.DIALOG.CONTENT.0001_PanelB2_1"
+msgctxt "STRINGS.DIALOG.CONTENT.0001_PanelA2_1"
 msgid ""
-msgstr "　　而那把黑伞，此刻正安静地靠在门边的伞架上。[br]\n"
-"\n"
-"　　地上的水渍通向厨房——[br]\n"
-"桌上摆着一碗还冒着热气的姜汤，[br]\n"
-"和一张字条：「回来就好」。[br]\n"
-"\n"
-"　　墙上的时钟指向八点。[br]\n"
-"雨声，停了。"
+msgstr
+"我坐在驾驶位上，把蒸汽的阀门扭紧，再扭紧。[br]\n"
+"一会儿，火车好像慢了下来，再过一会，道边的景色退得越来越慢。[br]\n"
+"我终于看清楚我所处的环境了：架在空中的镂心桥。[br]\n"
+"而路的另一头，是通往云霄的天桥。[br][page]"
+
+"我一把推开门，风一股脑往车厢里面蹿。[br]\n"
+"是时候结束了。[br]\n"
+"再会吧，多愁善感的我。[br]\n"
+"我一跃而下。"

@@ -24,10 +24,13 @@ func _run() -> void:
 		print("V: node %s char=%s pos=%s" % [key, String(nodes[key].char), str(nodes[key].pos)])
 	for cid in rail_head:
 		var line: Node2D = rail_head[cid]
-		print("V: rail %s x=%s top=%s bottom=%s" % [cid, str(line.a.x), str(line.a.y), str(line.b.y)])
+		print("V: rail %s x=%s top=%s bottom=%s secs=%d" % [cid, str(line.a.x), str(line.a.y), str(line.b.y), line.sections.size()])
 	for i in rungs_layer.get_child_count():
 		var line: Node2D = rungs_layer.get_child(i)
-		print("V: rung %d a=%s b=%s" % [i, str(line.a), str(line.b)])
+		print("V: rung %d a=%s b=%s secs=%d" % [i, str(line.a), str(line.b), line.sections.size()])
+	for i in previews_layer.get_child_count():
+		var line: Node2D = previews_layer.get_child(i)
+		print("V: preview %d a=%s b=%s dashed=%s" % [i, str(line.a), str(line.b), str(line.dashed)])
 	# 以屏幕中心为锚缩小, 验证滚轮缩放路径(等缓动结束)
 	_zoom_at(view * 0.5, 0.75)
 	await get_tree().create_timer(0.4).timeout
@@ -45,3 +48,9 @@ func _run() -> void:
 	_spawn_envelopes([nodes["0001:L"]])
 	show_monologue("（伊芙的独白：待填写）")
 	await get_tree().create_timer(0.8).timeout
+	# 引擎内截图(可靠路径: 先 force_draw 再等一帧; 窗口遮挡会拿到陈旧帧)
+	if DisplayServer.get_name() != "headless":
+		RenderingServer.force_draw()
+		await get_tree().process_frame
+		get_viewport().get_texture().get_image().save_png("user://map_visual.png")
+		print("V: shot saved")

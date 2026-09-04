@@ -134,6 +134,12 @@ func to_screen(lane: int, dist: int) -> Vector2:
 
 （原游戏横向滚动地图：生长轴为水平、泳道为竖直；若想竖排，把两轴对调即可。）
 
+**当前实现（竖排版 + 手动栅格，2026-09 起）**：
+
+- 布局常量在 `scenes/map/map.gd`：`UNIT_Y := 80`（纵向 1 格）、`GX := 222`（横向 1 格 = 半列宽，偶数 gx 对齐角色列轴线）、`HEADER_W := 444`（角色列宽）；
+- 关卡块位置由 `data/levels/levels_index.json` 的 `positions` 表手动指定（绝对栅格 `[gx, gy]`，key = `关卡id:行id`；未登记的节点回退自动布局）；
+- 连线由 `scenes/map/map_route.gd` 用 `assets/sceneUI/line/` 管件素材拼接（件 7/9 直段拉伸、件 0/1/4/5 四向弯角、`dotted_*` 虚线组给 pendings 待定边），替代下方 §4.3 的自绘 map_line 方案——同列竖直线、同高横线、跨列 S 弯（先竖→拐角→横向→拐角→竖）。
+
 ### 4.2 地图模型
 
 ```gdscript

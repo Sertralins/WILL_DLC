@@ -7,6 +7,10 @@ const LEVEL_DIR := "res://data/levels/"
 const INDEX_PATH := "res://data/levels/levels_index.json"
 const CHARACTERS_PATH := "res://data/characters.json"
 
+# 文本标记的运行时换算目标(控制字符, 不会与正文冲突):
+# [br] → \n 换行; [page] → \f 换页; [right] → RIGHT_MARK 该行右对齐
+const RIGHT_MARK := "\u001e"
+
 var level_id: String = ""
 var title: String = ""
 var unlock: String = ""
@@ -22,17 +26,32 @@ class Row:
 	var title: String = ""        # 本行自己的故事标题(独立起标题; 缺省用关卡 title)
 	var monologue: String = ""    # 写信人的一句独白(取信时以字幕形式出现在屏幕下方)
 	var character: String = ""    # 本行默认角色, 引用 characters.json 的 id
+	var anim: String = ""         # 本行动画框场景路径(关卡 JSON 里直接配; 空则回退人物的 characters.json anim)
 	var position: String = ""     # 地图布局 "泳道,距离": 泳道 -2/0/2(横向平行链), 距离 = 相对父节点的生长增量
 	var previous: String = ""     # 实线父边: "start"(信箱) 或 "0002:L"
 	var pendings: Array = []      # 待定父边(虚线): ["0001:R(S1)", ...] 括号内为要求的结局评级集合
 	var blocks: Array = []        # 固定句(黑块, TYPE 0): blocks[0] = 顶部框架, 最后一项 = 底部弹性块
 	var strips: Array = []        # 可排序句(字条, TYPE 1)
 	var variants: Array = []      # 条件句(TYPE 2): {id, base, text, text_key}, 结局 REPLACE 时替换 base
+	var order: Array = []         # 块与字条的初始排布顺序(可选): 固定块可与字条穿插,
+	                              # 如 ["PanelA1","A1","PanelA2","A2","PanelA3"];
+	                              # 缺省按约定: blocks[0] → strips → blocks[1:]
+	var readonly: Array = []      # 读信专用句(不进交换纸条界面, id 建议 Panel0 开头):
+	                              # 只在读信/回顾页出现, 位置由 order 指定,
+	                              # 无 order 时排在整封信最前(旁白/舞台说明习惯位置)
+	var title_block: Dictionary = {}  # 读信标题模块(可选): {text/text_key}, 在首页左上角演出;
+	                              # 缺省回退到第一句 Panel0 的第一行
 
 # —— 加载接口 ——
 
+# 测试注入: level_id → 关卡数据字典(内存构造, 优先于磁盘 JSON; 工具 probe 用, 游戏流程不写)
+static var overrides: Dictionary = {}
+
 static func load_level(id: String) -> LevelData:
 	var lv := LevelData.new()
+	if overrides.has(id):
+		lv._from_dict(overrides[id])
+		return lv
 	var path := LEVEL_DIR + id + ".json"
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
@@ -47,6 +66,13 @@ static func load_level(id: String) -> LevelData:
 
 static func load_index() -> Dictionary:
 	return _load_json_dict(INDEX_PATH)
+
+# 手动栅格位置表: levels_index.json 的 "positions", key = "<level_id>:<row_id>", value = [gx, gy]
+# (gx 以半列宽 222px 为一格, gy 以 80px 为一格; 未登记的节点走 map.gd 的自动布局)
+static func load_positions() -> Dictionary:
+	var index := load_index()
+	var v = index.get("positions", {})
+	return v if v is Dictionary else {}
 
 static func load_characters() -> Dictionary:
 	return _load_json_dict(CHARACTERS_PATH)
@@ -78,12 +104,16 @@ func _from_dict(data: Dictionary) -> void:
 		row.title = String(row_data.get("title", ""))
 		row.monologue = String(row_data.get("monologue", ""))
 		row.character = String(row_data.get("character", ""))
+		row.anim = String(row_data.get("anim", ""))
 		row.position = String(row_data.get("position", ""))
 		row.previous = String(row_data.get("previous", ""))
 		row.pendings = parse_pendings(row_data.get("pendings", []))
 		row.blocks = row_data.get("blocks", [])
 		row.strips = row_data.get("strips", [])
 		row.variants = row_data.get("variants", [])
+		row.order = row_data.get("order", [])
+		row.readonly = row_data.get("readonly", [])
+		row.title_block = row_data.get("title_block", {})
 		rows.append(row)
 	if row_count <= 0:
 		row_count = rows.size()
@@ -123,16 +153,20 @@ func first_row() -> Row:
 	return rows[0] if rows.size() > 0 else null
 
 # 句子文本取值: 优先内联 text, 其次 text_key → 剧情文本表(<level_id>.txt, PO 格式);
-# 都找不到时原样返回 text_key(便于一眼发现漏配)
+# 都找不到时原样返回 text_key(便于一眼发现漏配)。
+# 统一标记换算(内联 text 同样支持): [br] → 换行, [page] → \f 换页标记
 func sentence_text(s: Dictionary) -> String:
 	var t := String(s.get("text", ""))
 	if t != "":
-		return t
+		return _normalize_text(t)
 	var key := String(s.get("text_key", ""))
 	var table := _text_table()
 	if table.has(key):
-		return String(table[key])
+		return _normalize_text(String(table[key]))
 	return key
+
+static func _normalize_text(text: String) -> String:
+	return text.replace("[br]", "\n").replace("[page]", "\f").replace("[right]", RIGHT_MARK)
 
 # —— 剧情文本表 ——
 # 文本文件与关卡 JSON 同目录、同名 .txt, PO-lite 格式(仿原版 strings.po):
@@ -182,26 +216,60 @@ static func _unquote(s: String) -> String:
 	t = t.replace("\\n", "\n").replace("\\t", "\t").replace('\\"', '"').replace("\\\\", "\\")
 	return t
 
-# 拼接一条 msgstr 的相邻引号串; [br] → 换行; 其余 [标签] 剔除(演绎阶段再解析指令)
+# 拼接一条 msgstr 的相邻引号串; [br] → 换行; [page] → \f 换页标记(读信按页展示);
+# [right] → RIGHT_MARK 该行右对齐(读信排版用); 其余 [标签] 剔除(演绎阶段再解析指令)
 static func _join_po_lines(lines: Array) -> String:
 	var text := ""
 	for line in lines:
 		text += String(line)
 	text = text.replace("[br]", "\n")
+	text = text.replace("[page]", "\f")
+	text = text.replace("[right]", RIGHT_MARK)
 	var tag := RegEx.create_from_string("\\[[^\\]]*\\]")
 	text = tag.sub(text, "", true)
 	return text
 
-# 一行的初始阅读序列: 首固定块 → 字条 → 其余固定块
-# (对应原版 TYPE 0 首尾 + TYPE 1 中间; 读信与演绎都按这个顺序拼接)
+# 一行是否为读信专用句(不进交换纸条界面)
+func is_readonly(row: Row, id: String) -> bool:
+	for s in row.readonly:
+		if String(s.get("id", "")) == id:
+			return true
+	return false
+
+# 一行的初始布局序列(交换纸条界面, 块与字条可穿插): 行级 order 字段优先(剔除读信专用句),
+# 缺省按约定 = 首固定块 → 字条 → 其余固定块
+func layout_sequence(row: Row) -> Array[String]:
+	if not row.order.is_empty():
+		var out: Array[String] = []
+		for id in row.order:
+			if not is_readonly(row, String(id)):
+				out.append(String(id))
+		return out
+	var seq: Array[String] = []
+	if row.blocks.size() > 0:
+		seq.append(String(row.blocks[0].get("id", "")))
+	for strip in row.strips:
+		seq.append(String(strip.get("id", "")))
+	for i in range(1, row.blocks.size()):
+		seq.append(String(row.blocks[i].get("id", "")))
+	return seq
+
+# 一行的初始阅读序列(句子字典): 读信专用句包含在内, 位置由 order 指定;
+# 无 order 时读信专用句排在整封信最前(旁白/舞台说明习惯位置), 其余按约定
 func initial_sequence(row: Row) -> Array:
 	var seq: Array = []
-	if row.blocks.size() > 0:
-		seq.append(row.blocks[0])
-	for strip in row.strips:
-		seq.append(strip)
-	for i in range(1, row.blocks.size()):
-		seq.append(row.blocks[i])
+	if not row.order.is_empty():
+		for id in row.order:
+			var info := find_sentence(String(id))
+			if not info.is_empty():
+				seq.append(info["sentence"])
+		return seq
+	for s in row.readonly:
+		seq.append(s)
+	for id in layout_sequence(row):
+		var info := find_sentence(id)
+		if not info.is_empty():
+			seq.append(info["sentence"])
 	return seq
 
 # 全关查找句子(排列还原 / 重排阅览 / 演绎拼接用):
@@ -215,6 +283,9 @@ func find_sentence(id: String) -> Dictionary:
 			if String(s.get("id", "")) == id:
 				return {"sentence": s, "row": row}
 		for s in row.variants:
+			if String(s.get("id", "")) == id:
+				return {"sentence": s, "row": row}
+		for s in row.readonly:
 			if String(s.get("id", "")) == id:
 				return {"sentence": s, "row": row}
 	return {}

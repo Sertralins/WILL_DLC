@@ -7,7 +7,7 @@ var board: Node = null
 func _ready() -> void:
 	GameState.save_path = "user://save_as_smoke.json"
 	GameState.reset_save()
-	GameState.current_level_id = "0001"
+	GameState.current_level_id = ""
 	_run()
 
 func _run() -> void:
@@ -72,7 +72,7 @@ func _run() -> void:
 		if c is Card and c.locked:
 			locked_cards += 1
 	print("A: locked_cards=%d rank_visible=%s reset_blocked=%s" % [
-		locked_cards, str(board.rank_tag.visible), str(board.locked)])
+		locked_cards, str(board.rank_tags[0].visible), str(board.locked)])
 	print("A: LOCKED READY")
 	await get_tree().create_timer(10.0).timeout
 	print("A: ARRANGE SMOKE PASS")

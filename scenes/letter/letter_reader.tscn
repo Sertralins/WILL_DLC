@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dexmuaas82w8x"]
 
 [ext_resource type="Script" uid="uid://cpbi564fj0l4d" path="res://scenes/letter/letter_reader.gd" id="1_5gbsb"]
+[ext_resource type="PackedScene" uid="uid://b5d2pdkljf0he" path="res://scenes/xl/yf_anim.tscn" id="2_yfanim"]
 
 [node name="LetterReader" type="Control" unique_id=1585927459]
 layout_mode = 3
@@ -22,17 +23,48 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 6
 
+[node name="SilhouetteLayer" type="Control" parent="." unique_id=559981243]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="AnimSlot" type="Control" parent="SilhouetteLayer" unique_id=1791603337]
+anchors_preset = 0
+offset_left = 1400.0
+offset_top = 51.0
+offset_right = 1912.0
+offset_bottom = 1075.0
+scale = Vector2(0.9, 0.9)
+mouse_filter = 2
+
+[node name="YfAnimPreview" parent="SilhouetteLayer/AnimSlot" unique_id=764122622 instance=ExtResource("2_yfanim")]
+layout_mode = 0
+scale = Vector2(0.9, 0.9)
+
+[node name="EnvelopeLayer" type="Control" parent="." unique_id=1953201869]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="MarginContainer" type="MarginContainer" parent="." unique_id=1551377382]
 layout_mode = 1
 anchors_preset = -1
 anchor_left = 0.048
-anchor_top = 0.18100001
-anchor_right = 0.846
-anchor_bottom = 0.77900004
+anchor_top = 0.080000006
+anchor_right = 0.85300004
+anchor_bottom = 0.892
 offset_left = 0.83999634
-offset_top = 0.519989
-offset_right = 0.67993164
-offset_bottom = -0.32006836
+offset_top = -0.40000916
+offset_right = 0.23986816
+offset_bottom = -0.3600464
 mouse_filter = 2
 
 [node name="Lines" type="Control" parent="MarginContainer" unique_id=974410929]

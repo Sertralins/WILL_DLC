@@ -13,6 +13,17 @@ func _run() -> void:
 	print("T: nodes=%d new=%d grid=%d" % [nodes.size(), _collect_new().size(), grid_layer.get_child_count()])
 	# 同信 L/R 水平齐平
 	print("T: aligned_0001=%s" % str(is_equal_approx(float(nodes["0001:L"].pos.y), float(nodes["0001:R"].pos.y))))
+	# 手动栅格位置(levels_index.json positions): 0001:L [0,5] / 0001:R [2,5] / 0002:L [-2,10]
+	var manual_ok := is_equal_approx(float(nodes["0001:L"].pos.x), map_w * 0.5) \
+		and is_equal_approx(float(nodes["0001:L"].pos.y), BASE_GAP + 5.0 * UNIT_Y) \
+		and is_equal_approx(float(nodes["0001:R"].pos.x), map_w * 0.5 + 2.0 * GX) \
+		and is_equal_approx(float(nodes["0001:R"].pos.y), BASE_GAP + 5.0 * UNIT_Y) \
+		and is_equal_approx(float(nodes["0002:L"].pos.x), map_w * 0.5 - 2.0 * GX) \
+		and is_equal_approx(float(nodes["0002:L"].pos.y), BASE_GAP + 10.0 * UNIT_Y) \
+		and bool(nodes["0001:L"].get("manual", false)) \
+		and bool(nodes["0002:L"].get("manual", false))
+	print("T: manual_pos=%s" % str(manual_ok))
+	print("T: previews_initial=%d" % previews_layer.get_child_count())   # 初始无待定虚线(0001 未 reveal)
 	_on_mailbox()
 	await get_tree().create_timer(0.4).timeout
 	_on_envelope_click(_pending_envs[0])   # 点一封 → 关联组(L/R)自动先后生长
@@ -38,12 +49,40 @@ func _run() -> void:
 	if header_ctls.has("yf"):
 		k0 = String(header_ctls["yf"].texture.resource_path).get_file()
 	print("T: header_yf_before_ending=%s" % k0)
-	# 关联线应为红色实线(非虚线)
+	# 剧情线应是素材竖线管件(件 7)
+	var rail_tex_ok := true
+	for l in rails_layer.get_children():
+		if l.sections.size() != 1 or String(l.sections[0].kind) != "v":
+			rail_tex_ok = false
+		else:
+			var sp: Sprite2D = l.sections[0].seg.get_child(0)
+			rail_tex_ok = rail_tex_ok and sp.texture.resource_path.get_file() == "connecting_lines_7.png"
+	print("T: rail_solid_v=%s" % str(rail_tex_ok))
+	# 关联线应为红色实线横线(件 9, 非虚线)
 	var rung_ok := rungs_layer.get_child_count() > 0
 	for l in rungs_layer.get_children():
 		rung_ok = rung_ok and (not l.dashed) and l.line_color.is_equal_approx(RUNG_COLOR)
+		if l.sections.size() != 1 or String(l.sections[0].kind) != "h":
+			rung_ok = false
+		else:
+			var sp: Sprite2D = l.sections[0].seg.get_child(0)
+			rung_ok = rung_ok and sp.texture.resource_path.get_file() == "connecting_lines_9.png"
 	print("T: rail_anchor_ok=%s rung_red_solid=%s" % [str(anchor_ok), str(rung_ok)])
 	# 通关 0001 (BAD1) → 0002 unlock 通过; 0002 只有 L 行 → 不加红线
+	GameState.history["0001"] = ["BAD1"]
+	_rebuild_previews()
+	print("T: previews_bad1=%d" % previews_layer.get_child_count())   # BAD1 不满足 pendings(S1) → 0
+	GameState.history["0001"] = ["S1"]
+	_rebuild_previews()
+	# S1 达成 → 0002:L 的待定虚线出现(dotted 素材)
+	var preview_ok := previews_layer.get_child_count() == 1
+	if preview_ok:
+		var pl = previews_layer.get_child(0)
+		preview_ok = pl.dashed
+		if preview_ok and pl.sections.size() > 0:
+			var sp: Sprite2D = pl.sections[0].seg.get_child(0)
+			preview_ok = sp.texture.resource_path.get_file().begins_with("dotted_")
+	print("T: preview_s1=%s" % str(preview_ok))
 	GameState.history["0001"] = ["BAD1"]
 	_on_mailbox()
 	await get_tree().create_timer(0.4).timeout
@@ -51,6 +90,8 @@ func _run() -> void:
 	await get_tree().create_timer(4.5).timeout
 	print("T: revealed2=%s rails=%d rungs=%d blocks=%d" % [
 		str(revealed), rails_layer.get_child_count(), rungs_layer.get_child_count(), blocks_layer.get_child_count()])
+	print("T: rails_3=%s" % str(rails_layer.get_child_count() == 3))   # yf/qyy/jz 各一条主线/生长线
+	print("T: previews_after_reveal=%d" % previews_layer.get_child_count())   # 0002 已 reveal → 虚线消失
 	print("T: relations=%d" % _collect_relations().size())
 	var k1 := ""
 	if header_ctls.has("yf"):

@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://b5d2pdkljf0he"]
+
+[ext_resource type="SpriteFrames" path="res://assets/xl/yf_anim_sprite_frames.tres" id="1_frames"]
+
+[node name="YfAnim" type="Control" unique_id=567820087]
+custom_minimum_size = Vector2(512, 1024)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 512.0
+offset_bottom = 1024.0
+mouse_filter = 2
+
+[node name="Bounds" type="ReferenceRect" parent="." unique_id=2116093678]
+editor_only = true
+layout_mode = 0
+offset_right = 512.0
+offset_bottom = 1024.0
+mouse_filter = 2
+border_color = Color(1, 0.85, 0.25, 0.7)
+border_width = 2.0
+
+[node name="Frames" type="AnimatedSprite2D" parent="." unique_id=55028057]
+modulate = Color(1, 1, 1, 0.6)
+position = Vector2(207, 658)
+scale = Vector2(1.2, 1.2)
+sprite_frames = ExtResource("1_frames")
+playing = true
+autoplay = "default"

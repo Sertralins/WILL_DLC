@@ -98,7 +98,7 @@ class Watcher extends Node:
 			" cond_bg=", cond_bg)
 		var ok_d: bool = arr.white_bg.visible and arr.retry_btn.visible and not arr.decide_btn.visible \
 			and arr.rank_tags[0].visible and arr.rank_tags[1].visible and not arr.rank_tags[2].visible \
-			and cond_bg.a > 0.5 and cond_bg.a < 0.8 and cond_bg.g > cond_bg.b   # qyy 橄榄绿, 半透明
+			and cond_bg.a > 0.85 and cond_bg.g > cond_bg.b   # qyy 橄榄绿, 0.9 半透明
 		print("LOCKED-OK" if ok_d else "LOCKED-FAIL")
 
 		# —— E. 「再试一次」解除锁定 ——
@@ -109,6 +109,35 @@ class Watcher extends Node:
 		print("retry: white=", arr.white_bg.visible, " retry=", arr.retry_btn.visible,
 			" decide=", arr.decide_btn.visible, " rankL=", arr.rank_tags[0].visible)
 		print("RETRY-OK" if ok_e else "RETRY-FAIL")
+
+		# —— F. 重放信件读完 → 直接回排布白底锁定态(结算页已删除) ——
+		GameState.verdicts = {
+			"level_id": "0001", "ending_id": "S1", "rank": "S", "rep": 325,
+			"matched_index": 0, "changes": [{"type": "REPLACE", "data": "PanelB2_1"}],
+		}
+		GameState.review_queue = ["R"]
+		GameState.current_row = "R"
+		GameState.review_letter = true
+		GameFlow.goto("letter")
+		for i in 5:
+			await get_tree().process_frame
+		var letter2 = get_tree().current_scene
+		for i in 300:
+			await get_tree().process_frame
+			await get_tree().process_frame
+			if not is_instance_valid(letter2):
+				break
+			if letter2.start_button.visible:
+				break
+			letter2._handle_click()
+		print("review btn: '", letter2.start_button.text, "'")
+		letter2._on_start_button_pressed()
+		for i in 5:
+			await get_tree().process_frame
+		var after_review = get_tree().current_scene
+		print("scene after review letter: ", after_review.name, " locked=", after_review.locked,
+			" white=", after_review.white_bg.visible)
+		print("REVIEW-TO-ARRANGE-OK" if after_review.name == "Main" and after_review.locked else "REVIEW-TO-ARRANGE-FAIL")
 
 		# 清理隔离存档
 		if FileAccess.file_exists(GameState.save_path):

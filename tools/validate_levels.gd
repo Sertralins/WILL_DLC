@@ -80,7 +80,7 @@ func _validate_level(data: Dictionary, characters: Dictionary) -> void:
 			_error("行 id 重复: %s" % rid)
 		seen_rows[rid] = true
 
-		for kind in ["blocks", "strips"]:
+		for kind in ["blocks", "strips", "readonly"]:
 			for s in row_data.get(kind, []):
 				var sid := String(s.get("id", ""))
 				if sid == "":

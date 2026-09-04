@@ -32,7 +32,7 @@ const COLOR_TEXT := Color(0.1, 0.1, 0.16)
 const COLOR_BLOCK_TEXT := Color(0.93, 0.93, 1, 1)
 const COLOR_BLOCK_BG := Color(0, 0, 0, 0.4)   # 不透明字块背景: 黑色 60%
 
-# 点「决定」后的倒计时时长(秒):时钟走完才揭晓结局、才切场景
+# 首次解锁新结局时点「决定」后的倒计时时长(秒):时钟走完才揭晓结局、才切场景
 const DECIDE_COUNTDOWN := 5.0
 
 # 加载后的关卡数据(LevelData 结构化对象)
@@ -45,12 +45,18 @@ var single_row := false
 # + 右侧只剩「再试一次」「返回」+ 每栏显示结局 Rank 标签
 var locked := false
 
-# 倒计时进行中:屏蔽重复点击「决定」
+# 新结局倒计时进行中:屏蔽重复点击「决定」
 var _deciding := false
+
+# 各行条件句块(白色字条下方最后一块)上的倒计时色彩条, 与旋转时钟同帧启动
+var _cd_bars: Array = []
 
 @onready var board: Control = $BoardScroll/Board
 @onready var left_column: VBoxContainer = $BoardScroll/Board/LeftColumn
 @onready var right_column: VBoxContainer = $BoardScroll/Board/RightColumn
+# 人物剪影动画槽(EnvelopeLayer 下, 位置在场景文件里拖): 左槽=左列人物, 右槽=右列人物
+@onready var l_anim_slot: Control = $EnvelopeLayer/LAnimSlot
+@onready var r_anim_slot: Control = $EnvelopeLayer/RAnimSlot
 # 背景: 双行 = DualBG 模式(左右主题色 + 中央锯齿互补, scenes/arrange/dual_bg.tscn);
 #        单行 = 全屏 letter_bg 整图
 @onready var dual_bg: Control = $DualBG
@@ -106,6 +112,23 @@ func _build_layout() -> void:
 	single_row = level.row_count == 1
 	right_column.visible = not single_row
 	_set_visible(r_figure, not single_row)
+	# 剪影动画绑定: 左槽=第一行, 右槽=第二行(单行关右槽隐藏)
+	if level.rows.size() > 0:
+		_setup_row_anim(l_anim_slot, level.rows[0])
+		if level.rows.size() > 1 and not single_row:
+			_setup_row_anim(r_anim_slot, level.rows[1])
+		else:
+			CharacterAnim.setup(r_anim_slot, "")
+	else:
+		CharacterAnim.setup(l_anim_slot, "")
+		CharacterAnim.setup(r_anim_slot, "")
+
+# 槽位绑定行的动画: 关卡 JSON 行级 anim 直接配优先, 缺省按人物 characters.json 的 anim
+func _setup_row_anim(slot: Control, row: LevelData.Row) -> void:
+	if row.anim != "":
+		CharacterAnim.setup_path(slot, row.anim)
+	else:
+		CharacterAnim.setup(slot, String(row.character))
 	if single_row:
 		# 单人: 全屏底图(角色 letter_bg, 文档 §5.1) + 单列(x=634, 宽 992)
 		dual_bg.visible = false
@@ -150,6 +173,7 @@ func _apply_level() -> void:
 		return
 	# 判定状态先算好(锁定 + Rank 标签): 锁定态下字条黑底白字、不可拖拽
 	_restore_verdict_label()
+	_cd_bars.clear()
 	var characters: Dictionary = LevelData.load_characters()
 	# 本关有保存的排列快照(执行过、从阅览信件跳回)则按快照还原字条位置
 	var restore := GameState.sequences_level == level.level_id and not GameState.sequences.is_empty()
@@ -164,43 +188,47 @@ func _apply_level() -> void:
 		var row: LevelData.Row = level.rows[i]
 		var column := columns[i]
 		for child in column.get_children():
+			# 先移出树再延迟释放: 否则新块 add_child 撞名会被自动改名(@PanelContainer@N),
+			# 快照里存的 id 对不上, 还原时块就"消失"了
+			column.remove_child(child)
 			child.queue_free()
 		var row_color := _character_color(characters, row.character)
-		# 1. 顶部框架块(首固定句; 锁定态下条件句块染本行角色主题色)
-		if row.blocks.size() > 0:
-			_create_block(column, row.blocks[0], replace_map, locked, row_color)
-		# 2. 白色字条:颜色 = 定义该字条的行所对应的角色色(跨栏移动后身份不变,与原版一致)
+		# 块与字条的排布序列: 行级 order 字段优先(固定块可与字条穿插, 如块夹在两张字条之间);
+		# 缺省 = 首固定块 → 字条 → 其余固定块; 有快照时按快照序列还原(块仍在其固定位置)
+		var seq: Array[String] = level.layout_sequence(row)
 		if restore and GameState.sequences.has(row.id):
-			# 还原模式: 按快照序列逐张生成字条(黑块固定, 跳过; 跨栏字条按归属行取色)
-			for id in GameState.sequences[row.id]:
-				var info := level.find_sentence(String(id))
-				if info.is_empty() or _is_block_of(row, String(id)):
-					continue
+			seq = []
+			for sid in GameState.sequences[row.id]:
+				seq.append(String(sid))
+		# 顶部框架块 = 序列里的第一个固定块; 条件句块 = 最后一个固定块(挂倒计时色彩条)
+		var top_block := ""
+		var last_block := ""
+		for id in seq:
+			if _is_block_of(row, id):
+				if top_block == "":
+					top_block = id
+				last_block = id
+		for sid in seq:
+			var id := String(sid)
+			var info := level.find_sentence(id)
+			if info.is_empty():
+				continue
+			if _is_block_of(row, id):
+				# 固定块(黑块): 顶部框架块保持半透明黑; 白底锁定态其余块染本行角色主题色
+				_create_block(column, info["sentence"], replace_map, locked, row_color,
+					id == top_block, id == last_block)
+			else:
+				# 白色字条: 颜色 = 定义该字条的行所对应的角色色(跨栏移动后身份不变)
 				var home: LevelData.Row = info["row"]
 				_place_strip(
 					column,
-					String(id),
+					id,
 					_display_text(level, replace_map, info["sentence"]),
 					_character_color(characters, home.character),
 					locked,
-					replace_map.has(String(id))
+					replace_map.has(id)
 				)
-		else:
-			# 初始模式: 按定义顺序生成本行字条
-			var color := _character_color(characters, row.character)
-			for strip_data: Dictionary in row.strips:
-				_place_strip(
-					column,
-					String(strip_data.get("id", "")),
-					_display_text(level, replace_map, strip_data),
-					color,
-					locked,
-					replace_map.has(String(strip_data.get("id", "")))
-				)
-		# 3. 其余固定块(底部弹性块)
-		for b in range(1, row.blocks.size()):
-			_create_block(column, row.blocks[b], replace_map, locked, row_color)
-	# 4. 内容超出一屏时画布加高(滚轮上下滚动)
+# 4. 内容超出一屏时画布加高(滚轮上下滚动)
 	call_deferred("_fit_board_height")
 
 # 画布高度 = 最高一栏的内容高度 + 底部留白; 不足一屏保持一屏
@@ -211,18 +239,19 @@ func _fit_board_height() -> void:
 			max_h = maxf(max_h, col.get_combined_minimum_size().y)
 	board.custom_minimum_size.y = maxf(REF.y, COL_TOP + max_h + BOARD_BOTTOM)
 
-# 黑色情节块: 运行时按数据生成(文档: 块模板序列化位置是占位, 按信内容排布);
-# 锁定态下被结局 REPLACE 的条件句块: 底色 = 本行角色主题色半透明;
+# 情节块(固定句): 运行时按数据生成(文档: 块模板序列化位置是占位, 按信内容排布);
+# 配色: 顶部框架块(首固定句)与非白底态 = 半透明黑;
+#       白底锁定态下其余固定块染本行角色主题色半透明(0.9: 线性混合下白底会把低 alpha 洗成灰);
 # 唯一效果: 2px 黑色外投影
-func _create_block(column: VBoxContainer, block: Dictionary, replace_map: Dictionary, locked := false, row_color := Color(0, 0, 0, 1)) -> void:
+func _create_block(column: VBoxContainer, block: Dictionary, replace_map: Dictionary, locked := false, row_color := Color(0, 0, 0, 1), is_top := false, with_cd_bar := false) -> void:
 	var panel := PanelContainer.new()
 	panel.name = String(block.get("id", ""))
 	panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var sb := StyleBoxFlat.new()
-	if locked and replace_map.has(String(block.get("id", ""))):
-		sb.bg_color = Color(row_color.r, row_color.g, row_color.b, 0.6)   # 条件句: 角色主题色半透明
-	else:
+	if is_top or not locked:
 		sb.bg_color = COLOR_BLOCK_BG
+	else:
+		sb.bg_color = Color(row_color.r, row_color.g, row_color.b, 0.9)   # 白底锁定态: 本行角色主题色
 	sb.shadow_color = Color(0, 0, 0, 0.25)
 	sb.shadow_size = 2
 	sb.shadow_offset = Vector2(2, 2)
@@ -249,14 +278,24 @@ func _create_block(column: VBoxContainer, block: Dictionary, replace_map: Dictio
 	margin.add_child(text_label)
 	column.add_child(panel)
 
-# 句子的当前显示文本: 被最新结局 REPLACE 时显示条件句正文, 否则显示自身文本
+	# 白色字条下方的条件句块(每行最后一块): 挂倒计时色彩条, 平时隐藏;
+	# 「决定」后与旋转时钟同帧启动(原版红/蓝变体 = 各行角色主题色)
+	if with_cd_bar:
+		var bar := CdBar.new()
+		bar.name = "CdBar"
+		bar.bar_color = row_color
+		panel.add_child(bar)
+		_cd_bars.append(bar)
+
+# 句子的当前显示文本: 被最新结局 REPLACE 时显示条件句正文, 否则显示自身文本;
+# 排布界面上 [page] 换页标记按换行展示(换页只在读信场景生效), [right] 标记剔除
 func _display_text(level: LevelData, replace_map: Dictionary, sentence: Dictionary) -> String:
 	var sid := String(sentence.get("id", ""))
 	if replace_map.has(sid):
 		var info := level.find_sentence(String(replace_map[sid]))
 		if not info.is_empty():
-			return level.sentence_text(info["sentence"])
-	return level.sentence_text(sentence)
+			return level.sentence_text(info["sentence"]).replace("\f", "\n").replace(LevelData.RIGHT_MARK, "")
+	return level.sentence_text(sentence).replace("\f", "\n").replace(LevelData.RIGHT_MARK, "")
 
 # 某个句子 id 是否是本行的黑块(黑块固定不可移动, 还原排列时跳过)
 func _is_block_of(row: LevelData.Row, id: String) -> bool:
@@ -334,7 +373,7 @@ func _place_strip(column: VBoxContainer, id: String, text: String, color: Color,
 	# 上下边距一致; 2px 黑色外投影
 	var white := StyleBoxFlat.new()
 	if locked and is_condition:
-		white.bg_color = Color(color.r, color.g, color.b, 0.6)
+		white.bg_color = Color(color.r, color.g, color.b, 0.9)   # 与条件句块一致: 0.9 才看得出主题色
 	elif locked:
 		white.bg_color = Color(0.1, 0.1, 0.12, 0.92)
 	else:
@@ -410,16 +449,19 @@ func get_sequence_ids(column: VBoxContainer) -> Array[String]:
 			ids.append(String(child.name))
 	return ids
 
-# 点击"决定" = 做出决定:冻结排列 → 倒计时时钟走完 → 揭晓结局 → 进入下一场景。
+# 点击"决定" = 做出决定:冻结排列 → 判定结局 → 进入下一场景。
+# 判定后:
+# - 首次解锁的新结局 → 旋转时钟倒数(走完才揭晓结局、切场景);
+# - 重复结局(已解锁过)→ 不转钟, 立即揭晓、切场景。
 # 下一场景:
 # - 新解锁的结局, 且它的 CHANGE 会改动某行的 TYPE 2 条件句 → 信件阅览重放被改动的那行
-#   (REPLACE 换正文 / DRA 删除), 读完由 letter 场景进结算;
-# - 其余情况(已解锁过的结局 / 没有需要改动的内容)→ 直接进结算。
-# 从结算返回本场景时, 字条排列与判定结果都保留
+#   (REPLACE 换正文 / DRA 删除), 读完由 letter 场景回本场景的白底锁定态(结算展示);
+# - 其余情况(已解锁过的结局 / 没有需要改动的内容)→ 直接回本场景白底锁定态。
+# 结算展示 = 白底锁定态: 字条排列与判定结果都保留
 func _on_execute_pressed() -> void:
 	if _deciding or level == null or level.rows.is_empty():
 		return
-	# 1. 冻结这次决定的排列(倒计时期间遮罩挡住输入,字条不会再动)
+	# 1. 冻结这次决定的排列(倒计时期间不再响应「决定」,字条也不会再动)
 	var columns: Array[VBoxContainer] = [left_column, right_column]
 	var sequences: Dictionary = {}
 	for i in mini(level.rows.size(), columns.size()):
@@ -428,28 +470,48 @@ func _on_execute_pressed() -> void:
 	GameState.sequences = sequences
 	GameState.sequences_level = level.level_id
 
-	# 2. 倒计时旋转时钟(素材 assets/clock):走完之前不揭晓结局、不切场景
-	_deciding = true
-	decide_btn.disabled = true
-	result_label.text = "（判定中…）"
-	await CountdownClock.start(self, DECIDE_COUNTDOWN).finished
-	_deciding = false
-	decide_btn.disabled = false
-
-	# 3. 判定结局
+	# 2. 判定结局
 	var verdict := RuleEngine.judge(level, sequences)
 	if verdict.is_empty():
 		result_label.text = "【未命中】没有条件匹配(检查 conditions 是否缺 fallback)"
 		return
+
+	# 3. 首次解锁的新结局: 旋转时钟倒数(素材 assets/clock), 走完才揭晓、切场景;
+	#    重复结局(已解锁过): 不转钟, 直接揭晓
+	_deciding = true
+	decide_btn.disabled = true
+	# Bad 评级不进倒计时动画, 直接揭晓(初始排列默认命中 Bad 时尤其如此)
+	if bool(verdict.get("is_new", false)) and String(verdict.get("rank", "")) != "Bad":
+		result_label.text = "（判定中…）"
+		# 倒计时演出: 切白底 + 隐藏右侧按钮组 + 旋转时钟与色彩条同帧启动
+		white_bg.visible = true
+		dual_bg.visible = false
+		single_bg.visible = false
+		result_label.add_theme_color_override("font_color", Color(0.45, 0.25, 0.15))
+		for btn: TextureButton in [decide_btn, reset_btn, back_btn, retry_btn]:
+			btn.visible = false
+		var clock := CountdownClock.start(self, DECIDE_COUNTDOWN)
+		for bar: CdBar in _cd_bars:
+			bar.play()
+		await clock.finished
+		# 演出结束恢复按钮(随后揭晓结局并切场景; 恢复兜底避免间隙闪烁)
+		decide_btn.visible = true
+		reset_btn.visible = true
+		back_btn.visible = true
+		retry_btn.visible = locked
+	_deciding = false
+	decide_btn.disabled = false
+
+	# 4. 揭晓结局
 	_show_verdict(verdict)
 
-	# 4. 进入下一场景。rows = 该结局需要改动的行(REPLACE/DRA 涉及的 TYPE 2 条件句所在行);
+	# 5. 进入下一场景。rows = 该结局需要改动的行(REPLACE/DRA 涉及的 TYPE 2 条件句所在行);
 	#    已解锁过的结局不再重放(is_new 由 RuleEngine 在写入图鉴前判定)
 	var rows: Array = []
 	if bool(verdict.get("is_new", false)):
 		rows = RuleEngine.affected_rows(level, verdict)
 	if rows.is_empty():
-		GameFlow.goto("verdict")
+		GameFlow.goto("arrange")   # 直接回本场景白底锁定态(结算展示)
 		return
 	GameState.review_queue = rows
 	GameState.current_row = String(rows[0])

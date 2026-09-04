@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" uid="uid://bu4raplt2xol7" path="res://assets/button/button_general_light_pressed.png" id="7_lightp"]
 [ext_resource type="Texture2D" uid="uid://bc8xj8wbd7jfn" path="res://assets/button/button_general_dark_pressed.png" id="8_dark"]
 [ext_resource type="PackedScene" path="res://scenes/arrange/dual_bg.tscn" id="11_dualbg"]
+[ext_resource type="PackedScene" uid="uid://b5d2pdkljf0he" path="res://scenes/xl/yf_anim.tscn" id="12_yfanim"]
 
 [node name="Main" type="Control" unique_id=1702357096]
 layout_mode = 3
@@ -18,8 +19,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_main")
 
-[node name="WhiteBG" type="ColorRect" parent="."]
-visible = false
+[node name="WhiteBG" type="ColorRect" parent="." unique_id=1273975693]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -27,13 +27,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(1, 1, 1, 1)
 
 [node name="DualBG" parent="." unique_id=461616185 instance=ExtResource("11_dualbg")]
 layout_mode = 1
 
 [node name="SingleBG" type="TextureRect" parent="." unique_id=433068563]
-visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -43,6 +41,47 @@ grow_vertical = 2
 mouse_filter = 2
 expand_mode = 1
 stretch_mode = 6
+
+[node name="EnvelopeLayer" type="Control" parent="." unique_id=1476463648]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LAnimSlot" type="Control" parent="EnvelopeLayer" unique_id=1823353237]
+anchors_preset = 0
+offset_left = 122.0
+offset_top = 28.0
+offset_right = 634.0
+offset_bottom = 1052.0
+mouse_filter = 2
+
+[node name="YfAnimPreview" parent="EnvelopeLayer/LAnimSlot" unique_id=1279116593 instance=ExtResource("12_yfanim")]
+layout_mode = 0
+offset_left = -86.0
+offset_top = 43.0
+offset_right = 426.0
+offset_bottom = 1067.0
+
+[node name="RAnimSlot" type="Control" parent="EnvelopeLayer" unique_id=1351785483]
+anchors_preset = 0
+offset_left = 1408.0
+offset_top = 28.0
+offset_right = 1920.0
+offset_bottom = 1052.0
+mouse_filter = 2
+
+[node name="TextLayer" type="Control" parent="." unique_id=86450699]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
 
 [node name="BoardScroll" type="ScrollContainer" parent="." unique_id=200818647]
 layout_mode = 1
@@ -156,27 +195,32 @@ text = "原始状态"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="RetryButton" type="TextureButton" parent="EdgeButtons"]
-visible = false
+[node name="RetryButton" type="TextureButton" parent="EdgeButtons" unique_id=589778027]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
 offset_left = -294.0
-offset_top = 442.0
+offset_top = 651.99994
 offset_right = 108.0
-offset_bottom = 550.0
+offset_bottom = 759.99994
 grow_horizontal = 0
 rotation = -0.2617994
 scale = Vector2(0.95, 0.95)
-texture_normal = ExtResource("4_red")
-texture_pressed = ExtResource("5_redp")
+texture_normal = ExtResource("6_light")
+texture_pressed = ExtResource("6_light")
 
-[node name="RetryLabel" type="Label" parent="EdgeButtons/RetryButton"]
+[node name="RetryLabel" type="Label" parent="EdgeButtons/RetryButton" unique_id=122988831]
+modulate = Color(0, 0, 0, 1)
+self_modulate = Color(0, 0, 0, 1)
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -46.372276
+offset_top = -5.886762
+offset_right = -46.372284
+offset_bottom = -5.8867645
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
@@ -219,29 +263,29 @@ text = "返回"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="RankTagL" type="TextureRect" parent="."]
-visible = false
+[node name="RankTagL" type="TextureRect" parent="." unique_id=374679165]
 layout_mode = 0
-offset_left = 142.0
-offset_top = 728.0
-offset_right = 503.0
-offset_bottom = 888.0
+offset_left = -49.620102
+offset_top = 373.5947
+offset_right = 283.37988
+offset_bottom = 520.5947
+rotation = -0.2617994
 mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="RankTagR" type="TextureRect" parent="."]
-visible = false
+[node name="RankTagR" type="TextureRect" parent="." unique_id=1713017200]
 layout_mode = 0
-offset_left = 1742.0
-offset_top = 576.0
-offset_right = 2103.0
-offset_bottom = 736.0
+offset_left = 1558.0001
+offset_top = 442.99994
+offset_right = 1891.0001
+offset_bottom = 589.99994
+rotation = -0.2617994
 mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="RankTagM" type="TextureRect" parent="."]
+[node name="RankTagM" type="TextureRect" parent="." unique_id=1992138983]
 visible = false
 layout_mode = 0
 offset_left = 946.0

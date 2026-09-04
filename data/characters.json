@@ -4,7 +4,8 @@
 		"color": "#6b5445",
 		"letter_bg": "res://assets/background/letter_background/letter_bg_yf.png",
 		"header": "res://assets/header/header_yf_2.png",
-		"header_locked": "res://assets/header/header_yf_0.png"
+		"header_locked": "res://assets/header/header_yf_0.png",
+		"anim": "res://scenes/xl/yf_anim.tscn"
 	},
 	
 	"qyy": {
@@ -13,5 +14,10 @@
 		"letter_bg": "res://assets/background/letter_background/letter_bg_qyy.png",
 		"header": "res://assets/header/header_qyy_2.png",
 		"header_locked": "res://assets/header/header_qyy_0.png"
+	},
+
+	"jz": {
+		"name": "？？？",
+		"color": "#8a7fa3"
 	}
 }

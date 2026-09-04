@@ -12,8 +12,7 @@ const SCENES := {
 	"map": "res://scenes/map/map.tscn",                   # 信件墙/选关(邮箱生长新信件, 点击进入读信)
 	"letter": "res://scenes/letter/letter_reader.tscn",   # 信件阅览(打字机; 初始逐封阅读 / 新结局重放)
 	"recap": "res://scenes/recap/recap.tscn",             # 信件回顾页(读完信进入: 滚动阅览全文 + 另一封/回想/返回/开始!)
-	"arrange": "res://scenes/arrange/arrange_board.tscn",    # 交换字条主界面
-	"verdict": "res://scenes/verdict/verdict.tscn",       # 结算(评级 + 声望 + 已解锁结局)
+	"arrange": "res://scenes/arrange/arrange_board.tscn",    # 交换字条主界面(判定后的白底锁定态即结算展示)
 }
 
 # 切换场景(唯一入口): GameFlow.goto("arrange")

@@ -71,22 +71,32 @@ func _world_state() -> Dictionary:
 func _apply(level: LevelData, verdict: Dictionary) -> void:
 	GameState.verdicts = verdict
 
-	# 跨关历史: 本关已达成结局列表(CURRENT/ELLE 查询与图鉴的数据源)
+	# 首次达成判定: 必须在 history 更新前取快照(history 落盘, 重开游戏后依然正确;
+	# unlocked_endings 是内存态不落盘, 不能作为跨会话的 is_new 依据)
+	var is_new := not (GameState.history.get(level.level_id, []) as Array).has(String(verdict.ending_id))
+
+	# 跨关历史: 本关已达成结局列表(CURRENT/ELLE 查询与图鉴的数据源);
+	# 重复达成也移到末尾 = 最近达成的结局(地图方块回退与重进结算都取最后一项)
 	var list: Array = GameState.history.get(level.level_id, [])
-	if not list.has(String(verdict.ending_id)):
-		list.append(String(verdict.ending_id))
+	list.erase(String(verdict.ending_id))
+	list.append(String(verdict.ending_id))
 	GameState.history[level.level_id] = list
 
-	# 当前选择结局(地图方块显示用): 记到本关当前行的存档条目
-	GameState.row("%s:%s" % [level.level_id, GameState.current_row]).current = String(verdict.ending_id)
+	# 当前选择结局(地图方块显示用)与判定排列快照: 结局是关卡级的, 同关卡所有行同步
+	# (双行/三行的关联行是同一封信; 只写当前行会让其他行方块仍显示旧评级,
+	#  从其他行方块点进的结算 RANK 也错)
+	for row in level.rows:
+		var row_entry: Dictionary = GameState.row("%s:%s" % [level.level_id, row.id])
+		row_entry["current"] = String(verdict.ending_id)
+		row_entry["sequence"] = GameState.sequences.duplicate(true)
 
 	# 声望累计(跨关累积, 影响后续解锁)
 	GameState.total_rep += int(verdict.rep)
 
-	# 图鉴解锁条目: "关卡id:结局id"; 首次达成标记 is_new(重放演绎只放新结局)
+	# 图鉴解锁条目: "关卡id:结局id"; is_new 用上面的 history 快照(重放演绎只放新结局)
 	var entry := "%s:%s" % [level.level_id, String(verdict.ending_id)]
-	verdict["is_new"] = not GameState.unlocked_endings.has(entry)
-	if verdict["is_new"]:
+	verdict["is_new"] = is_new
+	if is_new:
 		GameState.unlocked_endings.append(entry)
 
 	# S 评级记录(SRANK(0001) 解锁条件用)

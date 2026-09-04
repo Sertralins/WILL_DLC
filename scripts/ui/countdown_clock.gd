@@ -29,7 +29,7 @@ const NEEDLE_PIVOT := Vector2(348.0, 68.5)
 const NEEDLE_BASE_ROTATION := PI / 2.0  # 素材里指针朝左(9 点), 转 90° 才指向 12 点
 const NEEDLE_TURNS_PER_SECOND := 1.0    # 一秒转一圈
 
-const SHADE_COLOR := Color(0.03, 0.02, 0.05, 0.66)  # 压暗背景的遮罩
+const SHADE_COLOR := Color(0.03, 0.02, 0.05, 0.3)  # 压暗背景的遮罩(0.66→0.4→0.3, 用户嫌太暗两次调亮)
 const FADE_TIME := 0.28
 const HOLD_TIME := 0.5  # 数到「1」、指针归位后停这一拍再收场
 
