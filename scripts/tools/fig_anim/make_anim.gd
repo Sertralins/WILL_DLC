@@ -14,7 +14,7 @@ extends EditorScript
 
 const INPUT_DIR := "res://assets/fig_anim/input"
 const OUT_TRES := "res://assets/fig_anim/output/%s/%s_sprite_frames.tres"
-const PY := "res://tools/fig_anim/process.py"
+const PY := "res://scripts/tools/fig_anim/process.py"
 const FPS := 24
 
 func _run() -> void:

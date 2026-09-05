@@ -2,7 +2,7 @@
 #   对 cd_shot1/2.png 在 L/R 两条条件句块区域按行扫描,
 #   找「亮块 / 黑间隙」交替模式并对比两帧的相位(验证彩块在滚动);
 #   再采样表盘中心与四周, 确认旋转时钟同场。
-# 用法: python tools/cd_shot_check.py
+# 用法: python scripts/tools/cd_shot_check.py
 import os
 from PIL import Image
 

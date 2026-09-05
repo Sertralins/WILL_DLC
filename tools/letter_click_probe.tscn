@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://tools/letter_click_probe.gd" id="1_lc"]
+[ext_resource type="Script" path="res://scripts/tools/letter_click_probe.gd" id="1_lc"]
 
 [node name="LetterClickProbe" type="Node"]
 script = ExtResource("1_lc")

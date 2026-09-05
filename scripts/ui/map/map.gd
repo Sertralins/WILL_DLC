@@ -28,7 +28,7 @@ const MAP_ROWS := 60             # 大地图纵向刻度数
 const ZOOM_MIN := 0.45
 const ZOOM_MAX := 1.5
 
-const ROUTE := preload("res://scenes/map/map_route.gd")   # 素材管件连线节点
+const ROUTE := preload("res://scripts/ui/map/map_route.gd")   # 素材管件连线节点
 
 # 块下细节卡(仿原版 A.png): 深棕圆角框, 上白底关卡名, 下灰底结局方块
 const CARD_W := 300.0
@@ -294,7 +294,7 @@ func _load_data() -> void:
 	var xs: Array = []
 	for k in range(0, cols + 1):
 		xs.append(k * HEADER_W)
-	var grid: Node2D = load("res://scenes/map/map_grid.gd").new()
+	var grid: Node2D = load("res://scripts/ui/map/map_grid.gd").new()
 	grid.setup(xs, ys, map_h)
 	grid_layer.add_child(grid)
 

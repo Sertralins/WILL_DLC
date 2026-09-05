@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://uow1okuhhi1e"]
 
-[ext_resource type="Script" uid="uid://bhsmynxjf1dde" path="res://scenes/recap/recap.gd" id="1_recap"]
+[ext_resource type="Script" uid="uid://bhsmynxjf1dde" path="res://scripts/ui/recap/recap.gd" id="1_recap"]
 [ext_resource type="FontFile" uid="uid://dlf6q22ilx5kk" path="res://assets/fonts/HYRunYuan-55W.ttf" id="2_font"]
 [ext_resource type="Texture2D" uid="uid://dklplm6n3wxqp" path="res://assets/button/button_general_red.png" id="3_red"]
 [ext_resource type="Texture2D" uid="uid://csumk0q8ttcxo" path="res://assets/button/button_general_red_pressed.png" id="4_redp"]

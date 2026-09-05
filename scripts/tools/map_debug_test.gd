@@ -4,7 +4,7 @@
 #   - PREP_HISTORY: 解锁表达式依赖的历史结局(对应 GameState.history), 比如 0002 要 0001 达成过 BAD1
 # 运行后信箱自动打开, 新信件按真实流程列出; 然后像正式游戏一样手动点信封/方块调试。
 # 调试用独立存档 user://save_debug.json, 不污染真实存档。
-extends "res://scenes/map/map.gd"
+extends "res://scripts/ui/map/map.gd"
 
 const TARGET_LEVEL := "0001"
 const PREP_HISTORY := {}

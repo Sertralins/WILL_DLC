@@ -17,9 +17,9 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-GameState="*res://autoload/game_state.gd"
-GameFlow="*res://autoload/game_flow.gd"
-RuleEngine="*res://autoload/rule_engine.gd"
+GameState="*res://scripts/game_state.gd"
+GameFlow="*res://scripts/game_flow.gd"
+RuleEngine="*res://scripts/rule_engine.gd"
 _mcp_game_helper="*res://addons/godot_ai/runtime/game_helper.gd"
 
 [display]

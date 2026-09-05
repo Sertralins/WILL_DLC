@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://tools/arrange_probe.gd" id="1_ap"]
+[ext_resource type="Script" path="res://scripts/tools/arrange_probe.gd" id="1_ap"]
 
 [node name="ArrangeProbe" type="Control"]
 layout_mode = 3

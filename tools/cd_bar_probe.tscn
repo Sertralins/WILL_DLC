@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://tools/cd_bar_probe.gd" id="1_cdb"]
+[ext_resource type="Script" path="res://scripts/tools/cd_bar_probe.gd" id="1_cdb"]
 
 [node name="CdBarProbe" type="Node"]
 script = ExtResource("1_cdb")

@@ -3,7 +3,7 @@
 #       带窗运行时另存 user://map_route_probe.png 供人工查看
 extends Node2D
 
-const ROUTE := preload("res://scenes/map/map_route.gd")
+const ROUTE := preload("res://scripts/ui/map/map_route.gd")
 
 var fails := 0
 

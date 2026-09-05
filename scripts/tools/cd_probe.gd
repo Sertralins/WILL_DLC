@@ -2,7 +2,7 @@
 #   存档重定向到临时文件(不污染本机进度); 默认把左栏字条对调(A2 提到 A1 上)
 #   命中 S1 新结局 → 走转钟分支, 1s 后打印色彩条/时钟/白底/按钮状态;
 #   -- shot: t=1.0 与 t=2.5 各截一张(force_draw 防窗口遮挡拿到陈旧帧),
-#            用 tools/cd_shot_check.py 采样验证斜纹+滚动;
+#            用 scripts/tools/cd_shot_check.py 采样验证斜纹+滚动;
 #   -- full: root 观察者等 7s 验证倒计时走完后的判定与场景切换;
 #   -- bad:  初始排列(不交换)命中 BAD1 → 不进动画, root 观察者验证直接揭晓切场景。
 # 用法: godot --headless --path . res://tools/cd_probe.tscn        (冒烟)

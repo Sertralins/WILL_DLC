@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dexmuaas82w8x"]
 
-[ext_resource type="Script" uid="uid://cpbi564fj0l4d" path="res://scenes/letter/letter_reader.gd" id="1_5gbsb"]
+[ext_resource type="Script" uid="uid://cpbi564fj0l4d" path="res://scripts/ui/letter/letter_reader.gd" id="1_5gbsb"]
 [ext_resource type="PackedScene" uid="uid://b5d2pdkljf0he" path="res://scenes/xl/yf_anim.tscn" id="2_yfanim"]
 
 [node name="LetterReader" type="Control" unique_id=1585927459]

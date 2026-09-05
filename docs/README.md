@@ -41,10 +41,10 @@
 | 文件 | 状态 | 作用 |
 |---|---|---|
 | `scenes/arrange/arrange_board.tscn` | ✅ 主场景 | 整个游戏画面:背景、滚动画布、左右故事栏、侧面板(**只有布局和样式,不含内容**) |
-| `scenes/arrange/arrange_board.gd` | ✅ 核心 | 关卡数据加载(JSON → 界面)、字条生成、执行按钮、兜底归位逻辑 |
-| `autoload/game_state.gd` | ✅ 核心 | autoload 全局状态:当前天、数据文件路径、字条序列、判定结果(唯一可序列化对象) |
-| `autoload/game_flow.gd` | ✅ 核心 | autoload 流程控制器:全项目唯一的场景切换入口 `goto()` |
-| `autoload/rule_engine.gd` | ✅ 核心 | autoload 判定引擎:按序匹配 conditions → 应用 CHANGE → 写 GameState(历史/声望/图鉴) |
+| `scripts/ui/arrange/arrange_board.gd` | ✅ 核心 | 关卡数据加载(JSON → 界面)、字条生成、执行按钮、兜底归位逻辑 |
+| `scripts/game_state.gd` | ✅ 核心 | autoload 全局状态:当前天、数据文件路径、字条序列、判定结果(唯一可序列化对象) |
+| `scripts/game_flow.gd` | ✅ 核心 | autoload 流程控制器:全项目唯一的场景切换入口 `goto()` |
+| `scripts/rule_engine.gd` | ✅ 核心 | autoload 判定引擎:按序匹配 conditions → 应用 CHANGE → 写 GameState(历史/声望/图鉴) |
 | `scripts/core/condition_engine.gd` | ✅ 核心 | 条件表达式引擎:SS/OS/OSS/S/IN/布尔/触发标记 + 跨关函数(判定与解锁共用) |
 | `data/levels/0001.json` | ✅ 核心 | **关卡数据**(每关一个 JSON):句子定义(id + text_key)、结局表、判定条件 |
 | `data/levels/0001.txt` | ✅ 剧情文本 | PO 格式(仿原版 strings.po):msgctxt 定位 + `[br]` 换行,**改文案只动这里** |
@@ -52,8 +52,8 @@
 | `data/characters.json` | ✅ 核心 | 角色档案:名字/配色/信纸背景(原版 PERSON 思路) |
 | `scenes/letter/letter_reader.tscn` / `.gd` | ✅ 信件场景(主场景) | 打字机阅览信件:逐封阅读流程 / 执行后的重排序列(含 CHANGE 应用,读完进结算) |
 | `scenes/verdict/verdict.tscn` / `.gd` | ✅ 结算场景 | 结局评级标签(S/A/B/C/D/E/Bad 配色)+ 声望结算 + 本关已解锁结局,读完返回排布 |
-| `scenes/arrange/card.gd` | ✅ 核心 | **字条组件**:拖拽、虚影预览、灰框、落座动画、防丢失 |
-| `scenes/arrange/drop_column.gd` | ✅ 核心 | 挂在左右两栏上:**接收拖入的字条,就近插入** |
+| `scripts/ui/arrange/card.gd` | ✅ 核心 | **字条组件**:拖拽、虚影预览、灰框、落座动画、防丢失 |
+| `scripts/ui/arrange/drop_column.gd` | ✅ 核心 | 挂在左右两栏上:**接收拖入的字条,就近插入** |
 | `project.godot` | ✅ | 项目配置(分辨率、缩放、主场景) |
 | `assets/art/` | ✅ 素材 | 背景图(Gemini 生成) |
 | `docs/reference/` | 📖 参考 | 玩法参考截图 `游戏关卡实例.png` |
@@ -88,7 +88,7 @@ Main (Control, 全屏)                        ┐
 - 上部情节块 `size_flags_vertical = 0`(高度固定);
 - **最下面的情节块**(PanelA2/PanelB2)保持默认 `FILL` —— 它是"弹性块",字条插入/移走时由它吸收高度变化,这就是"补位"效果的来源;
 - 字条**直接作为栏的子元素**插入(没有独立的"槽位"节点),位置由插入顺序决定;
-- **内容与布局分离**:情节块里的 `Text` 节点在场景里是空的,文字由 `scenes/arrange/arrange_board.gd` 启动时从 `data/levels/0001.json` 读入并填入(见 6.5 节)。
+- **内容与布局分离**:情节块里的 `Text` 节点在场景里是空的,文字由 `scripts/ui/arrange/arrange_board.gd` 启动时从 `data/levels/0001.json` 读入并填入(见 6.5 节)。
 
 ---
 
@@ -96,23 +96,23 @@ Main (Control, 全屏)                        ┐
 
 | # | 功能 | 实现位置 |
 |---|---|---|
-| 1 | 字条拖拽(虚影跟随 + 0.6 半透明) | `scenes/arrange/card.gd` `_get_drag_data()` |
-| 2 | 拖起时原位置显示**灰色占位框** | `scenes/arrange/card.gd` `_show_placeholder()` |
-| 3 | 松手后灰框消失 | `scenes/arrange/card.gd` `clear_placeholder()` |
-| 4 | **就近插入**:松手后字条插到离鼠标最近的缝隙 | `scenes/arrange/drop_column.gd` `_drop_data()` |
+| 1 | 字条拖拽(虚影跟随 + 0.6 半透明) | `scripts/ui/arrange/card.gd` `_get_drag_data()` |
+| 2 | 拖起时原位置显示**灰色占位框** | `scripts/ui/arrange/card.gd` `_show_placeholder()` |
+| 3 | 松手后灰框消失 | `scripts/ui/arrange/card.gd` `clear_placeholder()` |
+| 4 | **就近插入**:松手后字条插到离鼠标最近的缝隙 | `scripts/ui/arrange/drop_column.gd` `_drop_data()` |
 | 5 | 统一 16px 间距 + 自动补位/让位 | 栏的 `separation` + 弹性情节块 |
-| 6 | 落座**回弹动画**(TRANS_BACK 缓动 + 淡入) | `scenes/arrange/card.gd` `play_landing()` |
-| 7 | 拖到无效区域 → **自动归位** | `scenes/arrange/arrange_board.gd` 兜底 + `scenes/arrange/card.gd` `return_to_origin()` |
-| 8 | **防丢失看门狗**(字条永远不会消失) | `scenes/arrange/card.gd` `_process()` |
+| 6 | 落座**回弹动画**(TRANS_BACK 缓动 + 淡入) | `scripts/ui/arrange/card.gd` `play_landing()` |
+| 7 | 拖到无效区域 → **自动归位** | `scripts/ui/arrange/arrange_board.gd` 兜底 + `scripts/ui/arrange/card.gd` `return_to_origin()` |
+| 8 | **防丢失看门狗**(字条永远不会消失) | `scripts/ui/arrange/card.gd` `_process()` |
 | 9 | 大画布上下滚动(拖拽靠近边缘自动滚屏) | `scenes/arrange/arrange_board.tscn` `BoardScroll`(`scroll_deadzone = 60`) |
-| 10 | 「执 行」按钮 → **真判定**:按条件表求值出结局(评级 + 声望) | `scenes/arrange/arrange_board.gd` `_on_execute_pressed()` + `autoload/rule_engine.gd` |
-| 11 | **数据驱动**:JSON 关卡数据加载 | `scenes/arrange/arrange_board.gd` `_load_level()` / `_apply_level()` |
-| 12 | **提前占位预览**:悬停可放置位置时,下方元素实时让位 | `scenes/arrange/drop_column.gd` `update_preview_gap()` |
-| 13 | **边缘吸附**:鼠标在栏边缘 48px 内也算悬停该栏 | `scenes/arrange/arrange_board.gd` `_nearest_column_in_margin()` + `SNAP_MARGIN` |
-| 14 | **拖拽自动滚屏**:鼠标靠近视图上下边缘时画布自动滚动 | `scenes/arrange/arrange_board.gd` `_process()` + `AUTO_SCROLL_EDGE` / `AUTO_SCROLL_SPEED_UP` / `AUTO_SCROLL_SPEED_DOWN` |
-| 15 | **字条顺序读取**:按数组读取每栏字条顺序,供结局判定 | `scenes/arrange/arrange_board.gd` `get_strip_ids()` |
-| 16 | 「执 行」→ 跳信件场景按**当前排列**打字机重放(从第一张字条开始,跳过顶部黑块),读完返回且排列/判定保留;**被 REPLACE 的句子在排布场景同步显示条件句新正文** | `scenes/arrange/arrange_board.gd` + `scenes/letter/letter_reader.gd`(review 模式) |
-| 17 | 完整流程闭环:逐封读信(读完自动下一封)→ 排布 → 执行;**新解锁结局且 CHANGE 涉及条件句改动时**重放该行(REPLACE 换正文/DRA 删除),已解锁结局不再重放 | `scenes/letter/letter_reader.gd` + `scenes/arrange/arrange_board.gd` + `autoload/rule_engine.gd` |
+| 10 | 「执 行」按钮 → **真判定**:按条件表求值出结局(评级 + 声望) | `scripts/ui/arrange/arrange_board.gd` `_on_execute_pressed()` + `scripts/rule_engine.gd` |
+| 11 | **数据驱动**:JSON 关卡数据加载 | `scripts/ui/arrange/arrange_board.gd` `_load_level()` / `_apply_level()` |
+| 12 | **提前占位预览**:悬停可放置位置时,下方元素实时让位 | `scripts/ui/arrange/drop_column.gd` `update_preview_gap()` |
+| 13 | **边缘吸附**:鼠标在栏边缘 48px 内也算悬停该栏 | `scripts/ui/arrange/arrange_board.gd` `_nearest_column_in_margin()` + `SNAP_MARGIN` |
+| 14 | **拖拽自动滚屏**:鼠标靠近视图上下边缘时画布自动滚动 | `scripts/ui/arrange/arrange_board.gd` `_process()` + `AUTO_SCROLL_EDGE` / `AUTO_SCROLL_SPEED_UP` / `AUTO_SCROLL_SPEED_DOWN` |
+| 15 | **字条顺序读取**:按数组读取每栏字条顺序,供结局判定 | `scripts/ui/arrange/arrange_board.gd` `get_strip_ids()` |
+| 16 | 「执 行」→ 跳信件场景按**当前排列**打字机重放(从第一张字条开始,跳过顶部黑块),读完返回且排列/判定保留;**被 REPLACE 的句子在排布场景同步显示条件句新正文** | `scripts/ui/arrange/arrange_board.gd` + `scripts/ui/letter/letter_reader.gd`(review 模式) |
+| 17 | 完整流程闭环:逐封读信(读完自动下一封)→ 排布 → 执行;**新解锁结局且 CHANGE 涉及条件句改动时**重放该行(REPLACE 换正文/DRA 删除),已解锁结局不再重放 | `scripts/ui/letter/letter_reader.gd` + `scripts/ui/arrange/arrange_board.gd` + `scripts/rule_engine.gd` |
 | 18 | 结算场景:重放结束 → 评级标签 + 声望(增量/累计)+ 本关已解锁结局 → 返回排布 | `scenes/verdict/verdict.gd`(UI 代码构建) |
 
 ---
@@ -142,9 +142,9 @@ Godot 的 Control 拖放流程是一条固定的"链路",全部功能都挂在�
 
 | 链段 | 脚本 | 干什么 |
 |---|---|---|
-| 发起拖拽 | `scenes/arrange/card.gd` | 记位置、放灰框、挂虚影、隐藏自己 |
-| 接受放置 | `scenes/arrange/drop_column.gd` | 栏内就近插入,恢复显示、清灰框、播放动画 |
-| 兜底 | `scenes/arrange/arrange_board.gd` | 拖到无效区域时,由 Main 接收并"归位" |
+| 发起拖拽 | `scripts/ui/arrange/card.gd` | 记位置、放灰框、挂虚影、隐藏自己 |
+| 接受放置 | `scripts/ui/arrange/drop_column.gd` | 栏内就近插入,恢复显示、清灰框、播放动画 |
+| 兜底 | `scripts/ui/arrange/arrange_board.gd` | 拖到无效区域时,由 Main 接收并"归位" |
 
 **两个必须知道的细节:**
 
@@ -209,7 +209,7 @@ Godot 的 Control 拖放流程是一条固定的"链路",全部功能都挂在�
 
 ## 7. 代码逐段讲解
 
-### 7.1 `scenes/arrange/arrange_board.gd` — 场景总控(数据加载)
+### 7.1 `scripts/ui/arrange/arrange_board.gd` — 场景总控(数据加载)
 
 ```gdscript
 # ArrangeBoard.gd — 《WILL:美好世界》核心玩法:拖动字条改变故事结局
@@ -218,7 +218,7 @@ extends Control
 # 关卡数据(黑块文字、字条内容、角色配色)由 GameState 提供: 当前天的数据文件。
 # 路径注册在 GameState.DAYS 里, 场景不再硬编码自己的数据路径(架构设计.md 第 5 节)。
 
-const CardScript := preload("res://scenes/arrange/card.gd")
+const CardScript := preload("res://scripts/ui/arrange/card.gd")
 
 # 字条文字色(界面样式常量,不属于关卡内容)
 const COLOR_TEXT := Color(0.1, 0.1, 0.16)
@@ -332,7 +332,7 @@ func _character_color(characters: Dictionary, key: String) -> Color:
 - `_load_level()` 负责读文件 + 解析 JSON;`_apply_level()` 负责把数据"灌"进界面;
 - 黑块文字:JSON 的 `blocks[].node` 直接是场景节点名(`PanelA1` 等),按名找到面板,再 `find_child("Text")` 找到里面的文字标签填入;
 - 字条:JSON 的 `strips[]` 数组按顺序生成,`character` 决定色块颜色(`_character_color` 从 `characters` 表查十六进制色值);
-- **改内容 = 只改 JSON**,`scenes/arrange/arrange_board.gd` 一行都不用动。
+- **改内容 = 只改 JSON**,`scripts/ui/arrange/arrange_board.gd` 一行都不用动。
 
 ```gdscript
 # 创建一张可拖拽字条:白色字块 + 右上角角色小色块,插到栏的最下面情节块之前
@@ -384,7 +384,7 @@ func _place_strip(column: VBoxContainer, id: String, text: String, color: Color,
 
 **讲解:**
 - 字条结构:`PanelContainer`(白底) → `VBox` → 顶行 `HBox`(色块靠右) + 文字;
-- **三个关键点**:① 内部所有子节点 `mouse_filter = IGNORE`(否则拖不动);② `size_flags_vertical = SHRINK_BEGIN`(字条只占自身高度,多余空间留给弹性情节块);③ 色块命名为 `Tag`、文字命名为 `Label`,供 `scenes/arrange/card.gd` 通过 `find_child()` 查找。
+- **三个关键点**:① 内部所有子节点 `mouse_filter = IGNORE`(否则拖不动);② `size_flags_vertical = SHRINK_BEGIN`(字条只占自身高度,多余空间留给弹性情节块);③ 色块命名为 `Tag`、文字命名为 `Label`,供 `scripts/ui/arrange/card.gd` 通过 `find_child()` 查找。
 
 ```gdscript
 # 读取一栏当前的字条顺序(自上而下),返回 id 数组——结局判定就靠它
@@ -411,7 +411,7 @@ func _on_execute_pressed() -> void:
 # 字条拖到无效区域时,放置目标链会一路向上找到 Main:
 # 1) 若鼠标在某个栏的"吸附范围"内,把放置/预览转交给最近的栏;
 # 2) 否则归位回原位置。
-const SNAP_MARGIN := 48.0  # 吸附范围,与 scenes/arrange/drop_column.gd 保持一致
+const SNAP_MARGIN := 48.0  # 吸附范围,与 scripts/ui/arrange/drop_column.gd 保持一致
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
 	if not (data is Card):
@@ -447,14 +447,14 @@ func _nearest_column_in_margin() -> VBoxContainer:
 	return best
 ```
 
-**讲解:** 第 6 节的"父链查找"最终会走到根节点 Main。Main 作为**全屏兜底接收器**,还负责**边缘吸附**:鼠标落在某栏外扩 48px 的范围内时,把预览和放置都转交给最近的栏(`update_preview_gap` / `receive_drop`);其他无效区域 → `return_to_origin()` 归位。栏的 `scenes/arrange/drop_column.gd` 优先级更高(先被命中)。
+**讲解:** 第 6 节的"父链查找"最终会走到根节点 Main。Main 作为**全屏兜底接收器**,还负责**边缘吸附**:鼠标落在某栏外扩 48px 的范围内时,把预览和放置都转交给最近的栏(`update_preview_gap` / `receive_drop`);其他无效区域 → `return_to_origin()` 归位。栏的 `scripts/ui/arrange/drop_column.gd` 优先级更高(先被命中)。
 
 ---
 
-### 7.2 `scenes/arrange/card.gd` — 字条组件(拖拽核心)
+### 7.2 `scripts/ui/arrange/card.gd` — 字条组件(拖拽核心)
 
 ```gdscript
-# scenes/arrange/card.gd — 可拖拽字条(白色字块 + 右上角角色小色块)
+# scripts/ui/arrange/card.gd — 可拖拽字条(白色字块 + 右上角角色小色块)
 class_name Card
 extends PanelContainer
 
@@ -586,17 +586,17 @@ func _process(_delta: float) -> void:
 
 ---
 
-### 7.3 `scenes/arrange/drop_column.gd` — 栏的放置逻辑(含提前占位预览)
+### 7.3 `scripts/ui/arrange/drop_column.gd` — 栏的放置逻辑(含提前占位预览)
 
 ```gdscript
-# scenes/arrange/drop_column.gd
+# scripts/ui/arrange/drop_column.gd
 # 挂在左右两栏上:栏内任意位置都是放置区。
 # 拖动悬停时显示"提前占位"缝隙(下方元素实时让位,预览落位后的效果);
 # 松手后字条落到缝隙所在位置,与预览完全一致。
 # 另支持"边缘吸附":鼠标在栏边缘 SNAP_MARGIN 范围内也算悬停该栏。
 extends VBoxContainer
 
-# 吸附范围:鼠标离栏边缘这个距离内,也算悬停在该栏(与 scenes/arrange/arrange_board.gd 保持一致)
+# 吸附范围:鼠标离栏边缘这个距离内,也算悬停在该栏(与 scripts/ui/arrange/arrange_board.gd 保持一致)
 const SNAP_MARGIN := 48.0
 
 # 拖动悬停时显示的占位缝隙
@@ -615,7 +615,7 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 		return
 	receive_drop(data as Card, at_position)
 
-# —— 公开接口(scenes/arrange/arrange_board.gd 的边缘吸附转发会调用) ——
+# —— 公开接口(scripts/ui/arrange/arrange_board.gd 的边缘吸附转发会调用) ——
 
 # 放下字条:直接落到占位缝隙的位置,保证和预览一致
 func receive_drop(card: Card, at_position: Vector2) -> void:
@@ -724,7 +724,7 @@ func _process(_delta: float) -> void:
 - **缝隙高度 = 字条高度**,与最终插入的字条完全等高,所以预览位移与真实位移**分毫不差**;
 - **落点 = 字条原位置**(灰框处)时不显示缝隙——因为落位后布局不变;
 - `_insert_index()` 从上往下比较"落点与子元素中点"决定插入位置。**禁止的位置**:顶部标题区(0/1)与"最后情节块之后"(total);允许 2..total-1——顶部情节块之下、底部情节块之上的所有缝隙(含"最后一张字条下面")。**踩过的坑**:①钳制计数必须在循环前数总数——循环中途 `break` 后,边扫边数得到的计数是错的,会导致字条永远落在栏顶;②钳制上限曾写错,把下方位置挡掉,导致字条无法往下拖;③`_insert_index` 返回的是"排除被拖字条后的过滤索引",放进全列表前要换算(+1 当被拖字条在目标之前),否则缝隙永远插不到最下面一张字条的下面;
-- **数据模型**:黑色情节块固定在场景里(顺序 = 场景中的排列,不随游戏变化);字条是栏的动态子元素,其顺序即视觉顺序,用 `scenes/arrange/arrange_board.gd` 的 `get_strip_ids()` 直接读成数组,结局判定就按这个数组写分支。
+- **数据模型**:黑色情节块固定在场景里(顺序 = 场景中的排列,不随游戏变化);字条是栏的动态子元素,其顺序即视觉顺序,用 `scripts/ui/arrange/arrange_board.gd` 的 `get_strip_ids()` 直接读成数组,结局判定就按这个数组写分支。
 - 缝隙的清理有三处:落位时(`_drop_data`)、拖拽结束 / 鼠标离开本栏时(每帧 `_process` 兜底检查 `gui_is_dragging()` 与鼠标位置)。
 
 ---
@@ -736,7 +736,7 @@ func _process(_delta: float) -> void:
 **场景结构**(`scenes/letter/letter_reader.tscn`):
 
 ```
-LetterReader (Control, script: scenes/letter/letter_reader.gd)
+LetterReader (Control, script: scripts/ui/letter/letter_reader.gd)
 ├─ Background        信件背景图(assets/art/letter_bg_carlos.png),mouse_filter = IGNORE
 ├─ MarginContainer   文字区(锚点/颜色/字号按 `docs/reference/游戏信件实例.png` 设置:左 0.0714、上 0.2833、右 0.838、下 0.901;亮蓝白字 RGB(208,222,232);字号 38),mouse_filter = IGNORE
 │  └─ Lines (VBox)   每行文字是运行时生成的 Label(逐行打字机)
@@ -782,14 +782,14 @@ LetterReader (Control, script: scenes/letter/letter_reader.gd)
 | **加新关卡(多关卡)** | `data/levels/` 加 `0002.json`,并在 `data/levels/levels_index.json` 登记 |
 | **写结局判定** | 改 `data/levels/0001.json` 的 `conditions`(表达式如 `SS(A2,A1)`)与 `endings`(评级/声望/CHANGE),代码不用动 |
 | **改统一间距** | `scenes/arrange/arrange_board.tscn` → `LeftColumn` / `RightColumn` 的 `theme_override_constants/separation` |
-| **改落座动画手感** | `scenes/arrange/card.gd` → `play_landing()`:初始缩放 `1.12`、时长 `0.22`、`TRANS_BACK` 缓动 |
-| **改灰框样式** | `scenes/arrange/card.gd` → `_show_placeholder()`:颜色、边框宽度 |
+| **改落座动画手感** | `scripts/ui/arrange/card.gd` → `play_landing()`:初始缩放 `1.12`、时长 `0.22`、`TRANS_BACK` 缓动 |
+| **改灰框样式** | `scripts/ui/arrange/card.gd` → `_show_placeholder()`:颜色、边框宽度 |
 | **恢复彩色装饰带** | 参考 `docs/reference/游戏关卡实例.png`,在栏里给字条上下加同色 `ColorRect` |
 | **换背景图** | `scenes/arrange/arrange_board.tscn` → `Background` 节点的 `texture`,或替换 `assets/art/` 里的图片 |
-| **字条高度** | `scenes/arrange/arrange_board.gd` → `_place_strip()` 的 `body_height` 参数(默认 86) |
+| **字条高度** | `scripts/ui/arrange/arrange_board.gd` → `_place_strip()` 的 `body_height` 参数(默认 86) |
 
 ---
 
 ## 10. 一句话架构总结
 
-> **字条(`scenes/arrange/card.gd`)只负责"自己怎么被拖";栏(`scenes/arrange/drop_column.gd`)只负责"字条落到我这儿放哪";Main(`scenes/arrange/arrange_board.gd`)负责"关卡数据加载 + 无效归位";文案与配色在 `data/levels/0001.json`;全局状态与数据路径在 `autoload/game_state.gd`(autoload);场景切换只走 `GameFlow.goto()`。** 布局交给 VBox 容器(统一间距 + 弹性块),拖拽交给 Godot 内建拖放系统(虚影 + 父链查找),动画交给 Tween,丢不了交给看门狗。
+> **字条(`scripts/ui/arrange/card.gd`)只负责"自己怎么被拖";栏(`scripts/ui/arrange/drop_column.gd`)只负责"字条落到我这儿放哪";Main(`scripts/ui/arrange/arrange_board.gd`)负责"关卡数据加载 + 无效归位";文案与配色在 `data/levels/0001.json`;全局状态与数据路径在 `scripts/game_state.gd`(autoload);场景切换只走 `GameFlow.goto()`。** 布局交给 VBox 容器(统一间距 + 弹性块),拖拽交给 Godot 内建拖放系统(虚影 + 父链查找),动画交给 Tween,丢不了交给看门狗。

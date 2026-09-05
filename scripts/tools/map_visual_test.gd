@@ -1,5 +1,5 @@
 # map_visual_test.gd — 视觉自检: 两轮生长后展示大地图/剧情线/红线, 保持画面供截图
-extends "res://scenes/map/map.gd"
+extends "res://scripts/ui/map/map.gd"
 
 func _ready() -> void:
 	GameState.save_path = "user://save_visual.json"

@@ -1,6 +1,6 @@
 # map_smoke_test.gd — headless 冒烟测试: 邮箱生长 / 剧情线(竖) / 同信齐平+红线(横) / 信息窗 / 解锁求值
 # 运行: godot --headless --path . res://tools/map_smoke_test.tscn (headless 无帧率上限, 用外部 timeout 收尾)
-extends "res://scenes/map/map.gd"
+extends "res://scripts/ui/map/map.gd"
 
 func _ready() -> void:
 	GameState.save_path = "user://save_smoke.json"

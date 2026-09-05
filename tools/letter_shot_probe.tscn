@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://tools/letter_shot_probe.gd" id="1_ls"]
+[ext_resource type="Script" path="res://scripts/tools/letter_shot_probe.gd" id="1_ls"]
 
 [node name="LetterShotProbe" type="Node"]
 script = ExtResource("1_ls")

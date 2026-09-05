@@ -1,6 +1,6 @@
 # xl_anim_tres.py — 从抠图后的帧序列生成 Godot SpriteFrames(.tres)
 # 动画名 "default"(AnimatedSprite2D 默认自动播放), 24fps 循环(120 帧 = 5 秒一圈)
-# 用法: python tools/xl_anim_tres.py
+# 用法: python scripts/tools/xl_anim_tres.py
 import os
 
 FRAME_DIR = "res://assets/xl/yf_xl"

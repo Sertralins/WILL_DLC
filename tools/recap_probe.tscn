@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://tools/recap_probe.gd" id="1_probe"]
+[ext_resource type="Script" path="res://scripts/tools/recap_probe.gd" id="1_probe"]
 
 [node name="RecapProbe" type="Control"]
 layout_mode = 3

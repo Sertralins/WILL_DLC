@@ -5,7 +5,7 @@
 class_name CdBar
 extends Control
 
-const SHADER := preload("res://scenes/arrange/scroll_blocks.gdshader")
+const SHADER := preload("res://scripts/ui/widgets/scroll_blocks.gdshader")
 
 # 形状参照 assets/example/滚动条.png(569×125 实测): 主题色斜纹 + 白色斜纹交替,
 # 斜纹像素斜率 dx/dy=1.808(全块覆盖时按块宽高比换算成 UV 斜率, 保持同样视觉角度)

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bgi5qch7h34u4"]
 
-[ext_resource type="Script" uid="uid://bpdk5y6lydys3" path="res://tools/arrange_smoke_test.gd" id="1_asmoke"]
+[ext_resource type="Script" uid="uid://bpdk5y6lydys3" path="res://scripts/tools/arrange_smoke_test.gd" id="1_asmoke"]
 
 [node name="ArrangeSmoke" type="Control" unique_id=1506569653]
 layout_mode = 3

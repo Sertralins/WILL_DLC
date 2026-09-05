@@ -4,7 +4,7 @@
 #   单行 = CanvasLetter2(标题 + 标题线 + 单列字条区, 块宽 540)。
 extends Control
 
-const CardScript := preload("res://scenes/arrange/card.gd")
+const CardScript := preload("res://scripts/ui/arrange/card.gd")
 
 const REF := Vector2(1920, 1080)
 

@@ -1,6 +1,6 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://tools/decide_probe.gd" id="1_dp"]
+[ext_resource type="Script" path="res://scripts/tools/decide_probe.gd" id="1_dp"]
 
 [node name="DecideProbe" type="Node"]
 script = ExtResource("1_dp")

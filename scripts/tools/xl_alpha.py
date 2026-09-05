@@ -1,7 +1,7 @@
 # xl_alpha.py — 伊芙立绘序列抠图: 黑底 → 透明底白色剪影
 # 素材: assets/xl/yf_xl/伊芙_绿屏立绘_XXXXX.png (512×1024, 黑底 + ~74 亮度灰度人物)
 # 输出: assets/xl/alpha/yf_XXXXX.png (RGBA, 白色人物, alpha = clamp(lum/74, 0, 1))
-# 用法: python tools/xl_alpha.py
+# 用法: python scripts/tools/xl_alpha.py
 import os
 from PIL import Image
 
