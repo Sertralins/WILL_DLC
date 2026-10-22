@@ -15,7 +15,7 @@
 #   「返回」回选关地图。
 extends Control
 
-const LETTER_FONT := preload("res://assets/fonts/HYRunYuan-55W.ttf")
+const LETTER_FONT := preload("res://assets/fonts/HYRunYuan-45J.ttf")
 
 const MARGIN_X := 70.0             # 回顾页行边距(读信页是 200, 此处不同)
 const FONT_SIZE := 42
@@ -105,8 +105,12 @@ func _full_letter_text() -> String:
 func _show_start() -> bool:
 	if level.rows.size() == 1:
 		return true
-	var is_first_row: bool = row.id == String(level.rows[0].id)
-	return not (GameState.first_entry_level and is_first_row)
+	if not GameState.first_entry_level:
+		return true
+	for letter in level.rows:
+		if not GameState.row_read("%s:%s" % [level.level_id, letter.id]):
+			return false
+	return true
 
 # 「另一封」: 按行序跳到本关下一行(循环)
 func _on_other_letter() -> void:

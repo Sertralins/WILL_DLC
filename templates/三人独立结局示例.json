@@ -1,0 +1,194 @@
+{
+  "level_id": "three_person_demo",
+  "title": "三人独立结局示例",
+  "row_count": 3,
+  "unlock": "",
+  "rows": [
+    {
+      "id": "L",
+      "character": "yf",
+      "previous": "start",
+      "position": "0,3",
+      "title": "L 的独立故事",
+      "blocks": [
+        {
+          "id": "PanelA1",
+          "text": "我需要有人替我送信。"
+        },
+        {
+          "id": "PanelA2",
+          "text": "这件事还没有结果。"
+        }
+      ],
+      "strips": [
+        {
+          "id": "A1",
+          "text": "我把信交给了朋友。"
+        },
+        {
+          "id": "A2",
+          "text": "我留在原地等待。"
+        }
+      ],
+      "variants": [
+        {
+          "id": "PanelA2_1",
+          "base": "PanelA2",
+          "text": "事情终于有了圆满的结果。"
+        }
+      ],
+      "endings": {
+        "S1": {
+          "rank": "S",
+          "rep": 100,
+          "change": [
+            {
+              "type": "REPLACE",
+              "data": "PanelA2_1"
+            }
+          ]
+        },
+        "BAD1": {
+          "rank": "Bad",
+          "rep": 0,
+          "change": []
+        }
+      },
+      "conditions": [
+        {
+          "expr": "IN(M,A1)",
+          "ending": "S1"
+        },
+        {
+          "expr": "",
+          "ending": "BAD1",
+          "fallback": true
+        }
+      ]
+    },
+    {
+      "id": "R",
+      "character": "qyy",
+      "previous": "start",
+      "position": "0,3",
+      "title": "R 的独立故事",
+      "blocks": [
+        {
+          "id": "PanelB1",
+          "text": "我在路边遇到了一位访客。"
+        },
+        {
+          "id": "PanelB2",
+          "text": "这件事还没有结果。"
+        }
+      ],
+      "strips": [
+        {
+          "id": "B1",
+          "text": "我打开了门。"
+        },
+        {
+          "id": "B2",
+          "text": "有人敲门。"
+        }
+      ],
+      "variants": [
+        {
+          "id": "PanelB2_1",
+          "base": "PanelB2",
+          "text": "事情终于有了圆满的结果。"
+        }
+      ],
+      "endings": {
+        "S1": {
+          "rank": "S",
+          "rep": 200,
+          "change": [
+            {
+              "type": "REPLACE",
+              "data": "PanelB2_1"
+            }
+          ]
+        },
+        "BAD1": {
+          "rank": "Bad",
+          "rep": 0,
+          "change": []
+        }
+      },
+      "conditions": [
+        {
+          "expr": "SS(B2,B1)",
+          "ending": "S1"
+        },
+        {
+          "expr": "",
+          "ending": "BAD1",
+          "fallback": true
+        }
+      ]
+    },
+    {
+      "id": "M",
+      "character": "jz",
+      "previous": "start",
+      "position": "0,3",
+      "title": "M 的独立故事",
+      "blocks": [
+        {
+          "id": "PanelC1",
+          "text": "我在车站等候那封信。"
+        },
+        {
+          "id": "PanelC2",
+          "text": "这件事还没有结果。"
+        }
+      ],
+      "strips": [
+        {
+          "id": "C1",
+          "text": "火车离开了站台。"
+        },
+        {
+          "id": "C2",
+          "text": "我赶到车站。"
+        }
+      ],
+      "variants": [
+        {
+          "id": "PanelC2_1",
+          "base": "PanelC2",
+          "text": "事情终于有了圆满的结果。"
+        }
+      ],
+      "endings": {
+        "S1": {
+          "rank": "S",
+          "rep": 300,
+          "change": [
+            {
+              "type": "REPLACE",
+              "data": "PanelC2_1"
+            }
+          ]
+        },
+        "BAD1": {
+          "rank": "Bad",
+          "rep": 0,
+          "change": []
+        }
+      },
+      "conditions": [
+        {
+          "expr": "IN(M,A1)&&SS(C2,C1)",
+          "ending": "S1"
+        },
+        {
+          "expr": "",
+          "ending": "BAD1",
+          "fallback": true
+        }
+      ]
+    }
+  ]
+}

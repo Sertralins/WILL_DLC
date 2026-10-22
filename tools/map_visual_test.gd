@@ -1,3 +1,4 @@
+# 历史手工探针，依赖旧的 0001 双人 / 0002 数据；自动回归请运行 run_checks.ps1。
 # map_visual_test.gd — 视觉自检: 两轮生长后展示大地图/剧情线/红线, 保持画面供截图
 extends "res://scenes/map/map.gd"
 
@@ -13,7 +14,7 @@ func _run() -> void:
 	await get_tree().create_timer(0.6).timeout
 	_on_envelope_click(_pending_envs[0])   # 点一封 → 0001 L/R 关联组自动先后生长(等提示播完)
 	await get_tree().create_timer(8.0).timeout
-	GameState.history["0001"] = ["BAD1"]   # 当前=BAD1(X), S1 未解锁(空心) → 结局方块各态
+	preload("res://tools/test_fixtures.gd").set_history("0001", ["BAD1"])   # 当前=BAD1(X), S1 未解锁(空心) → 结局方块各态
 	_on_mailbox()
 	await get_tree().create_timer(0.6).timeout
 	_on_envelope_click(_pending_envs[0])   # 0002 链生长

@@ -17,6 +17,7 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+GameCursor="*res://autoload/game_cursor.gd"
 GameState="*res://autoload/game_state.gd"
 GameFlow="*res://autoload/game_flow.gd"
 RuleEngine="*res://autoload/rule_engine.gd"
@@ -33,6 +34,11 @@ window/stretch/aspect="expand"
 
 enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
 
+[input_devices]
+
+pointing/mouse/custom_image="res://assets/ui/cursors/play_hand.png"
+pointing/mouse/custom_image_hotspot=Vector2(56, 30)
+
 [physics]
 
 3d/physics_engine="Jolt Physics"
@@ -40,3 +46,4 @@ enabled=PackedStringArray("res://addons/godot_ai/plugin.cfg")
 [rendering]
 
 rendering_device/driver.windows="d3d12"
+anti_aliasing/quality/msaa_2d=2

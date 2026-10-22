@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://bquol2s6orkai"]
+[gd_scene format=3]
 
 [ext_resource type="Script" uid="uid://dd2uyvstpi7q0" path="res://scenes/arrange/arrange_board.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://dyqj6gdy56jqu" path="res://scenes/arrange/drop_column.gd" id="2_col"]

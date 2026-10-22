@@ -13,7 +13,8 @@
 		"color": "#515517",
 		"letter_bg": "res://assets/background/letter_background/letter_bg_qyy.png",
 		"header": "res://assets/header/header_qyy_2.png",
-		"header_locked": "res://assets/header/header_qyy_0.png"
+		"header_locked": "res://assets/header/header_qyy_0.png",
+		"anim": "res://scenes/xl/qyy_anim.tscn"
 	},
 
 	"jz": {

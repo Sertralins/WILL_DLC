@@ -30,11 +30,7 @@ const ZOOM_MAX := 1.5
 
 const ROUTE := preload("res://scenes/map/map_route.gd")   # 素材管件连线节点
 
-# 块下细节卡(仿原版 A.png): 深棕圆角框, 上白底关卡名, 下灰底结局方块
-const CARD_W := 300.0
-const CARD_TITLE_H := 88.0
-const CARD_BAND_H := 58.0
-const CARD_BORDER := 6.0
+const DetailCard := preload("res://scenes/map/map_detail_card.gd")
 
 var font: Font
 
@@ -83,7 +79,7 @@ var _click_gen := 0             # 点块代次(滚动竞态防护)
 func _ready() -> void:
 	font = load("res://assets/fonts/HYRunYuan-55W.ttf")
 	_build_static_ui()
-	GameState.load_game()   # 按存档还原(判定链文档 §4.4: revealed 节点直接呈现)
+	# GameState 在启动时读档；回地图使用内存进度，避免保存失败后被旧档覆盖。
 	_load_data()
 	revealed = GameState.revealed_nodes.duplicate()
 	for key in revealed.duplicate():
@@ -328,18 +324,7 @@ func _shift_subtree(key: String, delta: float) -> void:
 			_shift_subtree(String(k2), delta)
 
 func _world_ctx() -> Dictionary:
-	return {
-		"merged": [],
-		"sides": {},
-		"triggered": {},
-		"world_state": {
-			"history": GameState.history,
-			"sranks": GameState.sranks,
-			"read": GameState.read_rows,
-			"stories": [],
-			"achievements": {},
-		},
-	}
+	return {"merged": [], "sides": {}, "triggered": {}, "world_state": GameState.world_state()}
 
 func _char(cid: String) -> Dictionary:
 	return characters.get(cid, {})
@@ -354,7 +339,7 @@ func _rail_x(cid: String) -> float:
 func ranks_of(key: String) -> Array:
 	if not nodes.has(key):
 		return []
-	return GameState.history.get(String(nodes[key].level_id), [])
+	return GameState.row_history(key)
 
 # —— 人物栏(固定顶行): 没有信件=隐藏; 出现第一封信才显示整张 PNG ——
 
@@ -449,7 +434,7 @@ func _spawn_block(nd: Dictionary, animate: bool) -> void:
 		var cur := String(GameState.row(String(nd.key)).get("current", ""))
 		if cur == "":
 			cur = String(achieved[achieved.size() - 1])
-		var e: Dictionary = lv.endings.get(cur, {})
+		var e: Dictionary = lv.endings_for(String(nd.row_id)).get(cur, {})
 		var rk := String(e.get("rank", cur))
 		rank_txt = "X" if rk.to_lower() == "bad" else rk.substr(0, 1).to_upper()
 	var s_l := Label.new()
@@ -467,7 +452,7 @@ func _spawn_block(nd: Dictionary, animate: bool) -> void:
 	star.texture = load("res://assets/sceneUI/star.png")
 	star.size = Vector2(40, 40)
 	star.position = Vector2(BLOCK - 22, -24)
-	star.visible = achieved.size() >= lv.endings.size()   # 结局全部解锁 → 右上角星号
+	star.visible = not lv.endings_for(String(nd.row_id)).is_empty() and achieved.size() >= lv.endings_for(String(nd.row_id)).size()   # 结局全部解锁 → 右上角星号
 	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ctl.add_child(star)
 
@@ -890,91 +875,11 @@ func _open_cards(lid: String) -> void:
 func _create_card(key: String) -> void:
 	var nd: Dictionary = nodes[key]
 	var lv := LevelData.load_level(String(nd.level_id))
-	var achieved: Array = GameState.history.get(String(nd.level_id), [])
-	var endings: Dictionary = lv.endings
-	# 第一次打开(尚无结局): 只显示标题栏, 底部结局横带隐藏
-	var show_band: bool = achieved.size() > 0
-	var card_h := CARD_BORDER * 2.0 + CARD_TITLE_H + (CARD_BAND_H if show_band else 0.0)
-
-	# 卡挂在块正下方(世界坐标, 随相机缩放平移)
-	var card := Control.new()
-	card.position = Vector2(float(nd.pos.x) - CARD_W * 0.5, float(nd.pos.y) + BLOCK * 0.5 + 16.0)
-	card.size = Vector2(CARD_W, card_h)
-	card.pivot_offset = card.size * 0.5
-
-	var frame := Panel.new()
-	var fsb := StyleBoxFlat.new()
-	fsb.bg_color = Color("4a3b2c")
-	fsb.set_corner_radius_all(12)
-	frame.add_theme_stylebox_override("panel", fsb)
-	frame.set_anchors_preset(Control.PRESET_FULL_RECT)
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(frame)
-
-	var paper := ColorRect.new()
-	paper.color = Color("fbfaf4")
-	paper.position = Vector2(CARD_BORDER, CARD_BORDER)
-	paper.size = Vector2(CARD_W - CARD_BORDER * 2.0, CARD_TITLE_H)
-	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(paper)
-
-	# 关卡名(每行独立标题: 横向相连的多个块各显示各的故事名)
-	var title := Label.new()
-	title.text = String(nd.get("row_title", lv.title))
-	title.add_theme_font_override("font", font)
-	title.add_theme_font_size_override("font_size", 40)
-	title.add_theme_color_override("font_color", Color("3f3a33"))
-	title.position = paper.position
-	title.size = paper.size
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(title)
-
-	if show_band:
-		# 灰底横带 + 结局方块(黄色实心=当前选择, 实心=已解锁, 空心=未解锁, 灰色=条件已不可用;
-		# 评级字母显示在地图关卡块上, 不在这里)
-		var band := ColorRect.new()
-		band.color = Color("c9c7c2")
-		band.position = Vector2(CARD_BORDER, CARD_BORDER + CARD_TITLE_H)
-		band.size = Vector2(CARD_W - CARD_BORDER * 2.0, CARD_BAND_H)
-		band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		card.add_child(band)
-		var cur := String(GameState.row(String(nd.key)).get("current", ""))
-		if cur == "" and achieved.size() > 0:
-			cur = String(achieved[achieved.size() - 1])
-		var unavailable := _unavailable_endings(lv, achieved)
-		var total := endings.size()
-		var sq := 36.0
-		var gap := 14.0
-		var x0 := (CARD_W - (total * sq + (total - 1) * gap)) * 0.5
-		var i := 0
-		for eid in endings:
-			var e: Dictionary = endings[eid]
-			var is_achieved: bool = achieved.has(String(eid))
-			var is_current: bool = is_achieved and String(eid) == cur
-			var is_gray: bool = not is_achieved and unavailable.has(String(eid))
-			var sb := StyleBoxFlat.new()
-			if is_current:
-				sb.bg_color = Color("ffd83d")      # 当前选择: 黄色实心
-				sb.border_color = Color("cc9a00")
-			elif is_achieved:
-				sb.bg_color = Color("f3ae01")      # 已解锁: 实心
-				sb.border_color = Color("cc8f00")
-			elif is_gray:
-				sb.bg_color = Color("9a9a9a")      # 条件不可用: 灰色
-				sb.border_color = Color("777777")
-			else:
-				sb.bg_color = Color("fbfaf4")      # 未解锁: 空心
-				sb.border_color = Color("c25b6b")
-			sb.set_border_width_all(4)
-			var box := Panel.new()
-			box.add_theme_stylebox_override("panel", sb)
-			box.position = Vector2(x0 + i * (sq + gap), band.position.y + (CARD_BAND_H - sq) * 0.5)
-			box.size = Vector2(sq, sq)
-			box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			card.add_child(box)
-			i += 1
+	var achieved: Array = GameState.row_history(key)
+	var endings: Dictionary = lv.endings_for(String(nd.row_id))
+	var current := String(GameState.row(key).get("current", ""))
+	var card := DetailCard.build(String(nd.get("row_title", lv.title)), endings, achieved, current, font)
+	card.position = Vector2(float(nd.pos.x) - card.size.x * 0.5, float(nd.pos.y) + BLOCK * 0.5 + 16.0)
 
 	# 点卡 = 进读信
 	card.gui_input.connect(func(ev: InputEvent):
@@ -992,38 +897,10 @@ func _create_card(key: String) -> void:
 	tw.tween_property(card, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tw.tween_property(card, "modulate:a", 1.0, 0.15)
 
-# 条件已不可用的结局: 已达成结局的 CHANGE(REPLACE/DRA) 移除了其条件引用句 → 该结局再也无法达成(灰色)
-func _unavailable_endings(lv: LevelData, achieved: Array) -> Dictionary:
-	var removed := {}
-	for eid in achieved:
-		var e: Dictionary = lv.endings.get(String(eid), {})
-		for c in e.get("change", []):
-			var ctype := String(c.get("type", ""))
-			var data := String(c.get("data", ""))
-			if ctype == "DRA" or ctype == "D":
-				removed[data] = true
-			elif ctype == "REPLACE":
-				var info := lv.find_sentence(data)
-				if not info.is_empty():
-					removed[String(info["sentence"].get("base", ""))] = true
-	var out := {}
-	var re := RegEx.new()
-	re.compile("[A-Za-z][A-Za-z0-9_]*")
-	for cond in lv.conditions:
-		var eid2 := String(cond.get("ending", ""))
-		var expr := String(cond.get("expr", ""))
-		for m in re.search_all(expr):
-			if removed.has(String(m.get_string())):
-				out[eid2] = true
-				break
-	return out
-
+# 当前允许重试并恢复原句，历史 CHANGE 不代表其他结局永久不可达。
 func _enter_level(key: String) -> void:
 	var nd: Dictionary = nodes[key]
-	GameState.current_level_id = String(nd.level_id)
-	GameState.current_row = String(nd.row_id)
-	# 回顾页「开始!」判定用: 记录本次点进是否为该关卡首次进入(并落盘)
-	GameState.first_entry_level = GameState.mark_level_entered(String(nd.level_id))
+	GameState.enter_level(String(nd.level_id), String(nd.row_id))
 	# 已解锁过结局的关卡: 再进入直接到白底锁定态(结算展示), 不再重读信件
 	if GameState.history.get(String(nd.level_id), []).size() > 0:
 		_restore_ending(key)
@@ -1034,39 +911,8 @@ func _enter_level(key: String) -> void:
 # 已有结局的关卡重进: 按存档还原最近一次判定的结果与排列快照,
 # 让 arrange 场景直接进白底锁定态(结算展示), 而不是可拖拽的交换纸条画面
 func _restore_ending(key: String) -> void:
-	var nd: Dictionary = nodes[key]
-	var lid := String(nd.level_id)
-	var lv := LevelData.load_level(lid)
-	var achieved: Array = GameState.history.get(lid, [])
-	# 当前选择结局: 本行存档条目的 current, 缺省用最近达成的结局
-	var cur := String(GameState.row(key).get("current", ""))
-	if cur == "" and not achieved.is_empty():
-		cur = String(achieved[achieved.size() - 1])
-	var e: Dictionary = lv.endings.get(cur, {})
-	# 该结局在 conditions 里的序号(结算文案「命中条件 #n」用; 查不到用 0)
-	var matched := 0
-	for i in lv.conditions.size():
-		if String(lv.conditions[i].get("ending", "")) == cur:
-			matched = i
-			break
-	GameState.verdicts = {
-		"level_id": lid,
-		"ending_id": cur,
-		"rank": String(e.get("rank", "")),
-		"rep": int(e.get("rep", 0)),
-		"matched_index": matched,
-		"changes": e.get("change", []),
-	}
-	# 排列快照: 本行存档条目里的最近一次判定排列(兼容旧档: 找不到就找本关其他行)
-	var snap: Variant = GameState.row(key).get("sequence", {})
-	if not (snap is Dictionary) or (snap as Dictionary).is_empty():
-		for k2 in nodes:
-			if String(k2) != key and String(nodes[k2].level_id) == lid:
-				snap = GameState.row(String(k2)).get("sequence", {})
-				if snap is Dictionary and not (snap as Dictionary).is_empty():
-					break
-	GameState.sequences = snap if snap is Dictionary else {}
-	GameState.sequences_level = lid if not GameState.sequences.is_empty() else ""
+	var node: Dictionary = nodes[key]
+	GameState.restore_verdict(String(node.level_id), String(node.row_id))
 
 func _close_popup() -> void:
 	_click_gen += 1   # 作废飞行中的滚动开卡

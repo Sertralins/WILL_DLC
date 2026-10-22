@@ -23,6 +23,8 @@ var conditions: Array = []       # 判定表: 按序匹配、首个命中
 # 一行信件(对应原版 ROWCOUNT 的 L/R/M 行)
 class Row:
 	var id: String = ""           # "L" / "R" / "M"
+	var endings: Dictionary = {}
+	var conditions: Array = []
 	var title: String = ""        # 本行自己的故事标题(独立起标题; 缺省用关卡 title)
 	var monologue: String = ""    # 写信人的一句独白(取信时以字幕形式出现在屏幕下方)
 	var character: String = ""    # 本行默认角色, 引用 characters.json 的 id
@@ -34,13 +36,13 @@ class Row:
 	var strips: Array = []        # 可排序句(字条, TYPE 1)
 	var variants: Array = []      # 条件句(TYPE 2): {id, base, text, text_key}, 结局 REPLACE 时替换 base
 	var order: Array = []         # 块与字条的初始排布顺序(可选): 固定块可与字条穿插,
-	                              # 如 ["PanelA1","A1","PanelA2","A2","PanelA3"];
-	                              # 缺省按约定: blocks[0] → strips → blocks[1:]
+								  # 如 ["PanelA1","A1","PanelA2","A2","PanelA3"];
+								  # 缺省按约定: blocks[0] → strips → blocks[1:]
 	var readonly: Array = []      # 读信专用句(不进交换纸条界面, id 建议 Panel0 开头):
-	                              # 只在读信/回顾页出现, 位置由 order 指定,
-	                              # 无 order 时排在整封信最前(旁白/舞台说明习惯位置)
+								  # 只在读信/回顾页出现, 位置由 order 指定,
+								  # 无 order 时排在整封信最前(旁白/舞台说明习惯位置)
 	var title_block: Dictionary = {}  # 读信标题模块(可选): {text/text_key}, 在首页左上角演出;
-	                              # 缺省回退到第一句 Panel0 的第一行
+								  # 缺省回退到第一句 Panel0 的第一行
 
 # —— 加载接口 ——
 
@@ -101,6 +103,8 @@ func _from_dict(data: Dictionary) -> void:
 	for row_data in data.get("rows", []):
 		var row := Row.new()
 		row.id = String(row_data.get("id", ""))
+		row.endings = row_data.get("endings", {})
+		row.conditions = row_data.get("conditions", [])
 		row.title = String(row_data.get("title", ""))
 		row.monologue = String(row_data.get("monologue", ""))
 		row.character = String(row_data.get("character", ""))
@@ -254,6 +258,45 @@ func layout_sequence(row: Row) -> Array[String]:
 		seq.append(String(row.blocks[i].get("id", "")))
 	return seq
 
+# 存档可能来自旧版关卡，不能只凭字典非空就用它还原界面。
+# 所有纸条必须恰好出现一次；固定块仍属于原行且相对顺序不变。
+func is_valid_arrangement(snapshot: Dictionary) -> bool:
+	if snapshot.size() != rows.size():
+		return false
+	var expected := {}
+	var seen := {}
+	var fixed_owner := {}
+	for row in rows:
+		for id in layout_sequence(row):
+			expected[id] = true
+		for block in row.blocks:
+			fixed_owner[String(block.get("id", ""))] = row.id
+	for row in rows:
+		if not snapshot.get(row.id) is Array:
+			return false
+		var fixed: Array = []
+		var expected_fixed: Array = []
+		for id in layout_sequence(row):
+			if fixed_owner.has(id):
+				expected_fixed.append(id)
+		for id in snapshot[row.id]:
+			if not id is String or not expected.has(id) or seen.has(id):
+				return false
+			seen[id] = true
+			if fixed_owner.has(id):
+				if fixed_owner[id] != row.id:
+					return false
+				fixed.append(id)
+		if fixed != expected_fixed:
+			return false
+	return seen.size() == expected.size()
+
+func initial_arrangement() -> Dictionary:
+	var result := {}
+	for row in rows:
+		result[row.id] = layout_sequence(row)
+	return result
+
 # 一行的初始阅读序列(句子字典): 读信专用句包含在内, 位置由 order 指定;
 # 无 order 时读信专用句排在整封信最前(旁白/舞台说明习惯位置), 其余按约定
 func initial_sequence(row: Row) -> Array:
@@ -324,3 +367,34 @@ func apply_changes(seq: Array, changes: Array) -> Array:
 			continue
 		texts.append(sentence_text(info2["sentence"]))
 	return texts
+
+
+# 行级结局采用全关统一模式：任一行配置后，每行都必须提供条件和结局。
+# 老关卡仍使用顶层表，奖励按整关计一次。
+func has_row_endings() -> bool:
+	for letter in rows:
+		if not letter.endings.is_empty() or not letter.conditions.is_empty():
+			return true
+	return false
+
+func endings_for(row_id: String) -> Dictionary:
+	var letter := row_by_id(row_id)
+	return letter.endings if has_row_endings() and letter != null else endings
+
+func changes_for(verdict: Dictionary, row_id: String) -> Array:
+	if verdict.get("level_id", "") != level_id:
+		return []
+	if has_row_endings():
+		return verdict.get("rows", {}).get(row_id, {}).get("changes", [])
+	return verdict.get("changes", [])
+
+
+func supports_layout() -> bool:
+	if rows.size() not in [1, 2, 3] or row_count != rows.size():
+		return false
+	var seen := {}
+	for letter in rows:
+		if letter.id not in ["L", "R", "M"] or seen.has(letter.id):
+			return false
+		seen[letter.id] = true
+	return true

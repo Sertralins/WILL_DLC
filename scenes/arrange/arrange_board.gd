@@ -4,7 +4,12 @@
 #   单行 = CanvasLetter2(标题 + 标题线 + 单列字条区, 块宽 540)。
 extends Control
 
-const CardScript := preload("res://scenes/arrange/card.gd")
+const DropShadow := preload("res://scenes/arrange/drop_shadow.gd")
+const SNAP_RADIUS := preload("res://scenes/arrange/drop_column.gd").SNAP_MARGIN
+var _invalid_shadow: Control
+@onready var entrance := preload("res://scenes/arrange/entrance_animation.gd").new()
+
+const StripView := preload("res://scenes/arrange/strip_view.gd")
 
 const REF := Vector2(1920, 1080)
 
@@ -14,21 +19,20 @@ const COL_LAYOUT := {
 	"L": {"x": 360.0, "w": 550.0},
 	"R": {"x": 1010.0, "w": 550.0},
 }
-# 中缝(两列之间的窄缝): 拖过中缝 = 移到另一封信(对应 IN(L/R/M) 条件)
-const SEAM := [910.0, 1010.0]
 # 单行(参照 assets/example/单人交换纸条.png 实测): 立绘在左, 字条列 x=634 宽 992, 无标题
+# 三人结算章：参考白底画面的中心点，L / M / R 分别独立定位。
+const TRIPLE_RANK_CENTERS := {"L": Vector2(130, 350), "M": Vector2(955, 455), "R": Vector2(1760, 500)}
 const SINGLE_X := 634.0
 const SINGLE_W := 992.0
 const COL_TOP := 85.0
 
 # 字体(HYRunYuan)与字号
-const LETTER_FONT := preload("res://assets/fonts/HYRunYuan-55W.ttf")
-const FONT_SIZE := 28
-const LINE_H := 34.0          # 行高 28×1.2
+const LETTER_FONT := preload("res://assets/fonts/HYRunYuan-45J.ttf")
+const FONT_SIZE := 32
+const LINE_H := 36.0         # 行高 28×1.2
 const BLOCK_MIN_H := 56.0     # 句子块最小高度
 const BOARD_BOTTOM := 240.0   # 画布底部留白(滚动空间)
 
-const COLOR_TEXT := Color(0.1, 0.1, 0.16)
 const COLOR_BLOCK_TEXT := Color(0.93, 0.93, 1, 1)
 const COLOR_BLOCK_BG := Color(0, 0, 0, 0.4)   # 不透明字块背景: 黑色 60%
 
@@ -46,13 +50,20 @@ var single_row := false
 var locked := false
 
 # 新结局倒计时进行中:屏蔽重复点击「决定」
-var _deciding := false
+var _deciding: bool:
+	get: return GameState.session.phase == GameState.Session.Phase.DECIDING
+	set(value):
+		GameState.session.phase = GameState.Session.Phase.DECIDING if value else GameState.Session.Phase.ARRANGING
 
 # 各行条件句块(白色字条下方最后一块)上的倒计时色彩条, 与旋转时钟同帧启动
 var _cd_bars: Array = []
 
 @onready var board: Control = $BoardScroll/Board
 @onready var left_column: VBoxContainer = $BoardScroll/Board/LeftColumn
+@onready var middle_column: VBoxContainer = $BoardScroll/Board/MiddleColumn
+@onready var m_anim_slot: Control = $EnvelopeLayer/MAnimSlot
+var triple_background: Control
+
 @onready var right_column: VBoxContainer = $BoardScroll/Board/RightColumn
 # 人物剪影动画槽(EnvelopeLayer 下, 位置在场景文件里拖): 左槽=左列人物, 右槽=右列人物
 @onready var l_anim_slot: Control = $EnvelopeLayer/LAnimSlot
@@ -74,29 +85,37 @@ var _cd_bars: Array = []
 @onready var result_label: Label = $ResultLabel
 
 func _ready() -> void:
+	add_child(entrance)
 	decide_btn.pressed.connect(_on_execute_pressed)
 	reset_btn.pressed.connect(_on_reset_pressed)
 	retry_btn.pressed.connect(_on_retry_pressed)
 	back_btn.pressed.connect(_on_back_pressed)
 	_load_level()
+	# 每次从地图进入都滑入；判定演出结束回到结算态则留在原位。
+	# 原始状态和再试一次只重建内容，不调用人物入场。
+	if level != null and level.rows.size() in [1, 2] and (not locked or GameFlow.previous_scene == "map"):
+		CharacterAnim.slide_in(l_anim_slot)
+		if not single_row:
+			CharacterAnim.slide_in(r_anim_slot, true)
 
 # 「原始状态」: 字条恢复最初的排布顺序(清除本关排列快照后重建)
 func _on_reset_pressed() -> void:
 	if _deciding or locked:
 		return
-	GameState.sequences = {}
-	GameState.sequences_level = ""
+	GameState.reset_arrangement()
 	_apply_level()
 
 # 「返回」: 回主界面(选关地图)
 func _on_back_pressed() -> void:
+	if _deciding:
+		return
 	GameFlow.goto("map")
 
 # 「再试一次」(锁定态): 解除锁定, 回到可拖拽的交换纸条画面(保留当前排列)
 func _on_retry_pressed() -> void:
 	if _deciding:
 		return
-	GameState.verdicts = {}
+	GameState.retry_arrangement()
 	_build_layout()
 	_apply_level()
 
@@ -104,6 +123,12 @@ func _on_retry_pressed() -> void:
 
 func _load_level() -> void:
 	level = LevelData.load_level(GameState.current_level_id)
+	if not level.supports_layout():
+		result_label.text = "关卡行数配置有误；目前支持一至三人关卡。"
+		decide_btn.disabled = true
+		reset_btn.disabled = true
+		retry_btn.disabled = true
+		return
 	_build_layout()
 	_apply_level()
 
@@ -114,14 +139,19 @@ func _build_layout() -> void:
 	_set_visible(r_figure, not single_row)
 	# 剪影动画绑定: 左槽=第一行, 右槽=第二行(单行关右槽隐藏)
 	if level.rows.size() > 0:
-		_setup_row_anim(l_anim_slot, level.rows[0])
+		_setup_row_anim(l_anim_slot, level.row_by_id("L") if level.rows.size() == 3 else level.rows[0])
 		if level.rows.size() > 1 and not single_row:
-			_setup_row_anim(r_anim_slot, level.rows[1])
+			_setup_row_anim(r_anim_slot, level.row_by_id("R") if level.rows.size() == 3 else level.rows[1])
 		else:
 			CharacterAnim.setup(r_anim_slot, "")
 	else:
 		CharacterAnim.setup(l_anim_slot, "")
 		CharacterAnim.setup(r_anim_slot, "")
+	if level.rows.size() == 3:
+		_setup_row_anim(m_anim_slot, level.row_by_id("M"))
+	else:
+		CharacterAnim.setup(m_anim_slot, "")
+	_configure_columns()
 
 # 槽位绑定行的动画: 关卡 JSON 行级 anim 直接配优先, 缺省按人物 characters.json 的 anim
 func _setup_row_anim(slot: Control, row: LevelData.Row) -> void:
@@ -129,6 +159,15 @@ func _setup_row_anim(slot: Control, row: LevelData.Row) -> void:
 		CharacterAnim.setup_path(slot, row.anim)
 	else:
 		CharacterAnim.setup(slot, String(row.character))
+
+# 背景与栏目布局只配置一次，不夹在每个人物的动画绑定里重复执行。
+func _configure_columns() -> void:
+	middle_column.visible = level.rows.size() == 3
+	if triple_background:
+		triple_background.visible = middle_column.visible
+	if level.rows.size() == 3:
+		_configure_triple()
+		return
 	if single_row:
 		# 单人: 全屏底图(角色 letter_bg, 文档 §5.1) + 单列(x=634, 宽 992)
 		dual_bg.visible = false
@@ -165,7 +204,7 @@ func _set_visible(node: Node, v: bool) -> void:
 # 基准栏宽(布局参数, 不随子节点增长——字块垫底矩形会超出栏 5px,
 # 若用 column.size.x 会在每次重建时把栏越撑越宽)
 func _col_base_w() -> float:
-	return SINGLE_W if single_row else COL_LAYOUT["L"].w
+	return 480.0 if level.rows.size() == 3 else (SINGLE_W if single_row else COL_LAYOUT["L"].w)
 
 func _apply_level() -> void:
 	if level == null or level.rows.is_empty():
@@ -176,17 +215,16 @@ func _apply_level() -> void:
 	_cd_bars.clear()
 	var characters: Dictionary = LevelData.load_characters()
 	# 本关有保存的排列快照(执行过、从阅览信件跳回)则按快照还原字条位置
-	var restore := GameState.sequences_level == level.level_id and not GameState.sequences.is_empty()
+	var restore := GameState.sequences_level == level.level_id and level.is_valid_arrangement(GameState.sequences)
 	# 最新判定若 REPLACE 过某些句子(触发过阅览重放), 这些句子的显示文本换成条件句正文
-	var replace_map: Dictionary = {}
-	var verdict: Dictionary = GameState.verdicts
-	if String(verdict.get("level_id", "")) == level.level_id:
-		replace_map = level.change_maps(verdict.get("changes", [])).get("replace", {})
 	# 行 ↔ 栏:第 i 行对应第 i 栏(单行关卡只有左栏有内容)
-	var columns: Array[VBoxContainer] = [left_column, right_column]
+	var columns: Array[VBoxContainer] = _columns()
 	for i in mini(level.rows.size(), columns.size()):
 		var row: LevelData.Row = level.rows[i]
 		var column := columns[i]
+		var changes := level.change_maps(level.changes_for(GameState.verdicts, row.id))
+		var replace_map: Dictionary = changes.replace
+		var remove_ids: Dictionary = changes.remove
 		for child in column.get_children():
 			# 先移出树再延迟释放: 否则新块 add_child 撞名会被自动改名(@PanelContainer@N),
 			# 快照里存的 id 对不上, 还原时块就"消失"了
@@ -204,12 +242,16 @@ func _apply_level() -> void:
 		var top_block := ""
 		var last_block := ""
 		for id in seq:
+			if remove_ids.has(id):
+				continue
 			if _is_block_of(row, id):
 				if top_block == "":
 					top_block = id
 				last_block = id
 		for sid in seq:
 			var id := String(sid)
+			if remove_ids.has(id):
+				continue
 			var info := level.find_sentence(id)
 			if info.is_empty():
 				continue
@@ -230,11 +272,13 @@ func _apply_level() -> void:
 				)
 # 4. 内容超出一屏时画布加高(滚轮上下滚动)
 	call_deferred("_fit_board_height")
+	clear_drop_preview()
+	entrance.play(_columns())
 
 # 画布高度 = 最高一栏的内容高度 + 底部留白; 不足一屏保持一屏
 func _fit_board_height() -> void:
 	var max_h := 0.0
-	for col: VBoxContainer in [left_column, right_column]:
+	for col: VBoxContainer in _columns():
 		if col.visible:
 			max_h = maxf(max_h, col.get_combined_minimum_size().y)
 	board.custom_minimum_size.y = maxf(REF.y, COL_TOP + max_h + BOARD_BOTTOM)
@@ -306,31 +350,37 @@ func _is_block_of(row: LevelData.Row, id: String) -> bool:
 
 # 显示判定结果(执行后与场景重新载入后共用)
 func _show_verdict(verdict: Dictionary) -> void:
-	result_label.text = "【结局】%s 评级 %s 声望 +%d(命中条件 #%d)" % [
-		String(verdict.get("ending_id", "?")),
-		String(verdict.get("rank", "?")),
-		int(verdict.get("rep", 0)),
-		int(verdict.get("matched_index", 0)) + 1,
-	]
-	# 结局 Rank 标签(assets/RANK/ranktag<Rank>.png): 每栏一个(L/R/M), 与结局评级绑定;
-	# 本关有几行就亮几个(单行只亮 L)
-	var rk := String(verdict.get("rank", "?"))
-	var path := "res://assets/RANK/ranktag%s.png" % rk
-	if not ResourceLoader.exists(path):
-		return
-	var tex := load(path)
-	for i in rank_tags.size():
-		var tag: TextureRect = rank_tags[i]
-		tag.texture = tex
-		tag.visible = i < level.rows.size()
+	var summaries: Array[String] = []
+	for i in level.rows.size():
+		var row_id := level.rows[i].id
+		var item: Dictionary = verdict.get("rows", {}).get(row_id, verdict if not level.has_row_endings() else {})
+		var rank := String(item.get("rank", ""))
+		summaries.append("%s：%s %s" % [row_id, item.get("ending_id", "未判定"), rank])
+		var tag := rank_tags[i]
+		var path := "res://assets/RANK/ranktag%s.png" % rank
+		tag.visible = not rank.is_empty() and ResourceLoader.exists(path)
+		if tag.visible:
+			tag.texture = load(path)
+			if level.rows.size() == 3:
+				tag.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				tag.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				tag.size = Vector2(360, 160)
+				tag.pivot_offset = tag.size * 0.5
+				tag.position = TRIPLE_RANK_CENTERS[row_id] - tag.pivot_offset
+				tag.rotation_degrees = -12.0
+				tag.z_index = 1
+	result_label.text = "  |  ".join(summaries) + "  本次声望 +%d" % int(verdict.get("awarded_rep", 0))
 
 # 场景载入时恢复上次的判定结果显示(不是本关的判定则清空);
 # 本关判定过 = 锁定态: 白底 + 字条不可拖拽 + 右侧只剩「再试一次」「返回」+ 每栏 Rank 标签
 func _restore_verdict_label() -> void:
 	var verdict: Dictionary = GameState.verdicts
 	locked = String(verdict.get("level_id", "")) == level.level_id
+	GameState.session.phase = GameState.Session.Phase.RESULT if locked else GameState.Session.Phase.ARRANGING
 	# 锁定态背景换成白色(盖掉双人光柱/单人底图)
 	white_bg.visible = locked
+	if triple_background:
+		triple_background.visible = level.rows.size() == 3 and not locked
 	if locked:
 		dual_bg.visible = false
 		single_bg.visible = false
@@ -353,90 +403,9 @@ func _character_color(characters: Dictionary, key: String) -> Color:
 	var info: Dictionary = characters.get(key, {})
 	return Color(String(info.get("color", "#ffffff")))
 
-# 创建一张字条:白色字块 + 左上角斜角色标签(文档: 60 高起, 自动加高);
-# locked(判定结局后回到本场景)= 黑底白字、不可拖拽;
-# locked 且是条件句(被结局 REPLACE 的字条)= 底色换成角色主题色半透明;
-# 唯一效果: 2px 黑色外投影
+# 栏目负责放置，StripView 负责外观，Card 负责拖拽。
 func _place_strip(column: VBoxContainer, id: String, text: String, color: Color, locked := false, is_condition := false) -> void:
-	var strip: Card = CardScript.new()
-	strip.size_flags_vertical = Control.SIZE_SHRINK_BEGIN  # 只占自身高度,不吸收栏内多余空间
-	strip.locked = locked
-
-	var font := LETTER_FONT
-	var col_w := _col_base_w()               # 基准栏宽(不随子节点增长)
-	var wrap_w := maxf(col_w - 28.0, 1.0)    # 28 内容边距
-	var text_size := font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, wrap_w, FONT_SIZE)
-	var body_h := maxf(BLOCK_MIN_H, text_size.y)
-	strip.custom_minimum_size = Vector2(col_w, body_h + 24.0)
-
-	# 字块本体: 普通 = 白底; 锁定态 = 黑底白字; 锁定态条件句 = 角色主题色半透明
-	# 上下边距一致; 2px 黑色外投影
-	var white := StyleBoxFlat.new()
-	if locked and is_condition:
-		white.bg_color = Color(color.r, color.g, color.b, 0.9)   # 与条件句块一致: 0.9 才看得出主题色
-	elif locked:
-		white.bg_color = Color(0.1, 0.1, 0.12, 0.92)
-	else:
-		white.bg_color = Color.WHITE
-	white.content_margin_left = 14.0
-	white.content_margin_right = 14.0
-	white.content_margin_top = 12.0
-	white.content_margin_bottom = 12.0
-	white.shadow_color = Color(0, 0, 0, 0.25)
-	white.shadow_size = 2
-	white.shadow_offset = Vector2(2, 2)
-	strip.add_theme_stylebox_override("panel", white)
-
-	# 内容根(普通 Control, 以便在左上角放斜着的角色小标签)
-	var root := Control.new()
-	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.custom_minimum_size = Vector2(wrap_w, body_h)   # 显式最小尺寸, 保证白纸包住文字
-	strip.add_child(root)
-
-	var box := VBoxContainer.new()
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.add_theme_constant_override("separation", 6)
-	box.alignment = BoxContainer.ALIGNMENT_CENTER   # 文字在字条内垂直居中
-	box.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(box)
-
-	# 左上角小标签(按规格): 长 60 宽 30, 顺时针旋转 30°, 中心与字条左上角顶点重合;
-	# 颜色跟着人物色走, 跨栏移动后身份不变; 四周一圈 3px 半透明阴影
-	# 注: Control.position 是矩形左上角原点, 锚点实际落在 position + pivot_offset
-	var tag := ColorRect.new()
-	tag.name = "Tag"
-	tag.color = color
-	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tag.size = Vector2(45.0, 30.0)
-	tag.pivot_offset = tag.size * 0.5          # 旋转轴 = 矩形中心
-	tag.position = Vector2(-14.0, -12.0) - tag.pivot_offset   # 中心落在字条外框左上角
-	tag.rotation = deg_to_rad(30.0)            # 顺时针 30°
-	var tag_shadow := ColorRect.new()
-	tag_shadow.color = Color(0, 0, 0, 0.25)
-	tag_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tag_shadow.size = tag.size + Vector2(6.0, 6.0)   # 四周各多 3px
-	tag_shadow.pivot_offset = tag_shadow.size * 0.5
-	tag_shadow.position = tag.position + tag.pivot_offset - tag_shadow.pivot_offset   # 与标签同心
-	tag_shadow.rotation = tag.rotation
-	root.add_child(tag_shadow)
-	root.add_child(tag)
-
-	# 字条文字
-	var label := RichTextLabel.new()
-	label.name = "Label"
-	label.text = text
-	label.fit_content = false
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.add_theme_font_override("normal_font", LETTER_FONT)
-	label.add_theme_font_size_override("normal_font_size", FONT_SIZE)
-	label.add_theme_color_override("default_color", Color(0.95, 0.95, 0.98) if locked else COLOR_TEXT)
-	label.custom_minimum_size = Vector2(wrap_w, text_size.y)   # 实际文本高, 由 VBox 居中
-	box.add_child(label)
-
-	column.add_child(strip)
-	strip.setup(id, text)
+	column.add_child(StripView.build(id, text, color, _col_base_w(), locked, is_condition))
 
 # 读取一栏当前的排列顺序(自上而下),返回 id 数组——结局判定就靠它:
 # 白色字条 = 字条 id(如 A1);黑色情节块 = 节点名(如 PanelA1),同样计入顺序
@@ -459,10 +428,13 @@ func get_sequence_ids(column: VBoxContainer) -> Array[String]:
 # - 其余情况(已解锁过的结局 / 没有需要改动的内容)→ 直接回本场景白底锁定态。
 # 结算展示 = 白底锁定态: 字条排列与判定结果都保留
 func _on_execute_pressed() -> void:
-	if _deciding or level == null or level.rows.is_empty():
+	if not can_edit() or level == null or level.rows.is_empty() or level.rows.size() > 3:
+		return
+	# 正在拖动时不提交，避免把隐藏卡片或预览占位当成最终排列。
+	if get_viewport().gui_is_dragging():
 		return
 	# 1. 冻结这次决定的排列(倒计时期间不再响应「决定」,字条也不会再动)
-	var columns: Array[VBoxContainer] = [left_column, right_column]
+	var columns: Array[VBoxContainer] = _columns()
 	var sequences: Dictionary = {}
 	for i in mini(level.rows.size(), columns.size()):
 		sequences[level.rows[i].id] = get_sequence_ids(columns[i])
@@ -473,18 +445,20 @@ func _on_execute_pressed() -> void:
 	# 2. 判定结局
 	var verdict := RuleEngine.judge(level, sequences)
 	if verdict.is_empty():
-		result_label.text = "【未命中】没有条件匹配(检查 conditions 是否缺 fallback)"
+		result_label.text = "【未保存】请检查存档路径或磁盘空间" if GameState.last_save_error != OK else "【未命中】请检查每行 conditions 是否有兜底"
 		return
 
 	# 3. 首次解锁的新结局: 旋转时钟倒数(素材 assets/clock), 走完才揭晓、切场景;
 	#    重复结局(已解锁过): 不转钟, 直接揭晓
-	_deciding = true
+	_set_deciding(true)
 	decide_btn.disabled = true
 	# Bad 评级不进倒计时动画, 直接揭晓(初始排列默认命中 Bad 时尤其如此)
-	if bool(verdict.get("is_new", false)) and String(verdict.get("rank", "")) != "Bad":
+	if RuleEngine.needs_countdown(verdict):
 		result_label.text = "（判定中…）"
 		# 倒计时演出: 切白底 + 隐藏右侧按钮组 + 旋转时钟与色彩条同帧启动
 		white_bg.visible = true
+		if triple_background:
+			triple_background.visible = false
 		dual_bg.visible = false
 		single_bg.visible = false
 		result_label.add_theme_color_override("font_color", Color(0.45, 0.25, 0.15))
@@ -499,7 +473,7 @@ func _on_execute_pressed() -> void:
 		reset_btn.visible = true
 		back_btn.visible = true
 		retry_btn.visible = locked
-	_deciding = false
+	# 保持输入冻结直到离开场景，避免揭晓与切场景之间又接收一次拖拽。
 	decide_btn.disabled = false
 
 	# 4. 揭晓结局
@@ -513,52 +487,143 @@ func _on_execute_pressed() -> void:
 	if rows.is_empty():
 		GameFlow.goto("arrange")   # 直接回本场景白底锁定态(结算展示)
 		return
-	GameState.review_queue = rows
-	GameState.current_row = String(rows[0])
-	GameState.review_letter = true
+	GameState.begin_review(rows)
 	GameFlow.goto("letter")
 
-# —— 兜底放置逻辑(文档: 中缝跨行拖放) ——
+# 统一输入开关：按钮、卡片和栏目都遵守同一个编辑状态。
+func can_edit() -> bool:
+	return level != null and level.supports_layout() and not locked and not _deciding and not entrance.playing
+
+func _set_deciding(active: bool) -> void:
+	_deciding = active
+	for column in _columns():
+		column._remove_preview_gap()
+		for child in column.get_children():
+			if child is Card:
+				child.locked = active or locked
+
+# —— 拖放路由：每帧更新，所以鼠标经过背景和非法区域时也有提示 ——
+func _process(_delta: float) -> void:
+	var viewport := get_viewport()
+	var data: Variant = viewport.gui_get_drag_data()
+	if can_edit() and viewport.gui_is_dragging() and data is Card:
+		_route_preview(data, viewport.get_mouse_position())
+	else:
+		clear_drop_preview()
 
 func _can_drop_data(_at_position: Vector2, data: Variant) -> bool:
-	if not (data is Card):
+	if not can_edit() or not data is Card:
 		return false
-	_route_preview(data as Card, get_viewport().get_mouse_position())
-	return true
+	return _route_preview(data, get_viewport().get_mouse_position())
 
 func _drop_data(_at_position: Vector2, data: Variant) -> void:
-	if not (data is Card):
-		return
-	_route_drop(data as Card, get_viewport().get_mouse_position())
+	if data is Card:
+		_route_drop(data, get_viewport().get_mouse_position())
 
-# 目标栏: 中缝 x∈[950,1016] → 另一栏(跨行 = 移到另一封信);
-# 单行关只允许左栏; 双行按字条列区间归属; 都不在 → null(归位)
+# 先选最近的栏目，扩大范围但不抢另一栏；中缝保留跨行交换行为。
 func _target_column(card: Card, mouse: Vector2) -> VBoxContainer:
-	if mouse.y < 0.0 or mouse.y > REF.y:
+	if not get_viewport_rect().has_point(mouse):
 		return null
-	if single_row:
-		return left_column
-	if mouse.x >= SEAM[0] and mouse.x <= SEAM[1]:
-		return right_column if card.origin_slot == left_column else left_column
-	if mouse.x >= COL_LAYOUT["L"].x and mouse.x <= COL_LAYOUT["L"].x + COL_LAYOUT["L"].w:
-		return left_column
-	if mouse.x >= COL_LAYOUT["R"].x and mouse.x <= COL_LAYOUT["R"].x + COL_LAYOUT["R"].w:
-		return right_column
-	return null
+	if level.rows.size() == 2:
+		var left_edge := left_column.global_position.x + left_column.size.x
+		var right_edge := right_column.global_position.x
+		if mouse.x >= left_edge and mouse.x <= right_edge:
+			return right_column if card.origin_slot == left_column else left_column
+	var nearest: VBoxContainer = null
+	var distance := INF
+	for column in _columns():
+		if not column.visible:
+			continue
+		var rect: Rect2 = column.get_global_rect()
+		var dx := maxf(maxf(rect.position.x - mouse.x, mouse.x - rect.end.x), 0)
+		if dx <= SNAP_RADIUS and dx < distance:
+			distance = dx
+			nearest = column
+	return nearest
 
-# 悬停占位缝隙路由到目标栏(栏外清空所有缝隙)
-func _route_preview(card: Card, mouse: Vector2) -> void:
-	var col := _target_column(card, mouse)
-	if col:
-		col.update_preview_gap(card, col.get_local_mouse_position())
-	else:
-		for c: VBoxContainer in [left_column, right_column]:
-			if c.has_method("_remove_preview_gap"):
-				c._remove_preview_gap()
+# 返回值同时驱动鼠标可放置状态和阴影颜色，避免“黑色预览却放不下”。
+func _route_preview(card: Card, mouse: Vector2) -> bool:
+	if not can_edit() or card.locked:
+		clear_drop_preview()
+		return false
+	var column := _target_column(card, mouse)
+	for other in _columns():
+		if other != column:
+			other._remove_preview_gap()
+	if column != null:
+		var local := column.get_global_transform().affine_inverse() * mouse
+		if column.update_preview_gap(card, local):
+			_hide_invalid_shadow()
+			return true
+	_show_invalid_shadow(card, column, mouse)
+	return false
 
 func _route_drop(card: Card, mouse: Vector2) -> void:
-	var col := _target_column(card, mouse)
-	if col:
-		col.receive_drop(card, col.get_local_mouse_position())
-		return
+	if can_edit() and not card.locked:
+		var column := _target_column(card, mouse)
+		if column != null:
+			var local := column.get_global_transform().affine_inverse() * mouse
+			if column.receive_drop(card, local):
+				return
 	card.return_to_origin()
+
+# 非法候选不撑开栏目，红色阴影只是覆盖提示，松手回原位置。
+func _show_invalid_shadow(card: Card, column: VBoxContainer, mouse: Vector2) -> void:
+	if not is_instance_valid(_invalid_shadow):
+		_invalid_shadow = DropShadow.new()
+		_invalid_shadow.allowed = false
+		_invalid_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_invalid_shadow.z_index = 50
+		add_child(_invalid_shadow)
+	_invalid_shadow.visible = true
+	_invalid_shadow.size = Vector2(column.size.x if column != null else card.size.x, card.size.y)
+	var x := column.global_position.x if column != null else mouse.x - card.size.x * 0.5
+	var y := clampf(mouse.y - card.size.y * 0.5, 0, maxf(0, get_viewport_rect().size.y - card.size.y))
+	_invalid_shadow.global_position = Vector2(x, y)
+
+func _hide_invalid_shadow() -> void:
+	if is_instance_valid(_invalid_shadow):
+		_invalid_shadow.visible = false
+
+func clear_drop_preview() -> void:
+	for column in _columns():
+		column._remove_preview_gap()
+	_hide_invalid_shadow()
+
+
+# 返回数据行对应的栏目。三人视觉位置 L / M / R，与 JSON 数组顺序解耦。
+func _columns() -> Array[VBoxContainer]:
+	if level != null and level.rows.size() == 3 and level.supports_layout():
+		var by_id := {"L": left_column, "R": right_column, "M": middle_column}
+		var result: Array[VBoxContainer] = []
+		for letter in level.rows:
+			result.append(by_id[letter.id])
+		return result
+	return [left_column, right_column]
+
+# 三人布局按参考画面：480 宽、60 横向间距、45 纵向间距。
+func _configure_triple() -> void:
+	dual_bg.hide()
+	single_bg.hide()
+	var chars := LevelData.load_characters()
+	if not triple_background:
+		triple_background = preload("res://scenes/arrange/triple_bg.gd").new()
+		add_child(triple_background)
+		move_child(triple_background, $EnvelopeLayer.get_index())
+	var columns := [left_column, middle_column, right_column]
+	var slots := [l_anim_slot, m_anim_slot, r_anim_slot]
+	var ids := ["L", "M", "R"]
+	var colors: Array[Color] = []
+	result_label.position = Vector2(180, 1020)
+	result_label.size = Vector2(1350, 50)
+	result_label.add_theme_font_size_override("font_size", 22)
+	for i in 3:
+		var row := level.row_by_id(ids[i])
+		var x := 180.0 + i * 540.0
+		columns[i].position = Vector2(x, 70)
+		columns[i].size.x = 480
+		columns[i].add_theme_constant_override("separation", 45)
+		slots[i].position = Vector2(x - 100, 28)
+		slots[i].scale = Vector2.ONE
+		colors.append(_character_color(chars, row.character))
+	triple_background.setup(colors)

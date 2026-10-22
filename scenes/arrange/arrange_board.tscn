@@ -74,6 +74,14 @@ offset_right = 1920.0
 offset_bottom = 1052.0
 mouse_filter = 2
 
+[node name="MAnimSlot" type="Control" parent="EnvelopeLayer"]
+visible = false
+offset_left = 600.0
+offset_top = 180.0
+offset_right = 1112.0
+offset_bottom = 1204.0
+mouse_filter = 2
+
 [node name="TextLayer" type="Control" parent="." unique_id=86450699]
 layout_mode = 1
 anchors_preset = 15
@@ -111,6 +119,16 @@ layout_mode = 0
 offset_left = 1010.0
 offset_top = 85.0
 offset_right = 1560.0
+offset_bottom = 1055.0
+theme_override_constants/separation = 30
+script = ExtResource("2_col")
+
+[node name="MiddleColumn" type="VBoxContainer" parent="BoardScroll/Board"]
+visible = false
+layout_mode = 0
+offset_left = 590.0
+offset_top = 85.0
+offset_right = 1050.0
 offset_bottom = 1055.0
 theme_override_constants/separation = 30
 script = ExtResource("2_col")

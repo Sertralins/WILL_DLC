@@ -1,260 +1,330 @@
-# game_state.gd — 全局游戏状态(纯数据单例, autoload 注册名: GameState)
-#
-# 职责(见 docs/架构设计.md 第 3 节):
-# - 向各场景提供"当前游戏相关的数据"(当前关卡、数据文件路径);
-# - 存放跨场景共享的运行时状态(字条排列、判定结果、已解锁结局);
-# - 不引用任何场景、不参与场景切换(跳转统一走 GameFlow)。
+# 全局状态：save_data 是持久进度，其他字段是界面状态或查询索引。
+# 修改进度请调用本类方法；不要直接写 history / sranks 等派生索引。
 extends Node
 
-# —— 数据路径 ——
-# 关卡数据: 每关一个 JSON(data/levels/<id>.json), 索引与角色档案的读取见 LevelData
+const Store := preload("res://scripts/core/save_store.gd")
+const ROW_IDS := ["L", "R", "M"]
 const LEVEL_DIR := "res://data/levels/"
 
-# 当前关卡与当前阅览的信件行(信件墙/map 场景建好后由它改写)
-var current_level_id: String = "0001"
-var current_row: String = "L"
+# —— 当前场景状态（重启从地图进入，不恢复半截演出）——
+const Session := preload("res://scripts/core/game_session.gd")
+var session := Session.new()
 
-# —— 运行时状态(跨场景共享, 场景只负责读写) ——
+var current_level_id: String:
+	get: return session.current_level_id
+	set(value): session.current_level_id = value
+var current_row: String:
+	get: return session.current_row
+	set(value): session.current_row = value
+var sequences: Dictionary:
+	get: return session.sequences
+	set(value): session.sequences = value
+var sequences_level: String:
+	get: return session.sequences_level
+	set(value): session.sequences_level = value
+var verdicts: Dictionary:
+	get: return session.verdicts
+	set(value): session.verdicts = value
+var review_letter: bool:
+	get: return session.review_letter
+	set(value): session.review_letter = value
+var review_queue: Array:
+	get: return session.review_queue
+	set(value): session.review_queue = value
+var first_entry_level: bool:
+	get: return session.first_entry_level
+	set(value): session.first_entry_level = value
 
-# 各行字条排列序列: { 行id: [句子id序列] }
-# ArrangeBoard 点「执行」时写入; RuleEngine 的输入来源(docs/文件结构与开发路线.md §5)
-var sequences: Dictionary = {}
-
-# 排列快照所属的关卡 id(判定"回到排布场景时是否按快照还原排列")
-var sequences_level: String = ""
-
-# 重排后阅览模式: 执行后 letter 场景按当前排列重放信件(临时状态, 不存档)
-var review_letter: bool = false
-
-# 重排阅览队列: 执行后需要重放的行 id 列表(每读完一行弹出一个)
-var review_queue: Array = []
-
-# 判定结果: 结局 id / 声望 / CHANGE 应用(RuleEngine 写入, 结算场景展示)
-var verdicts: Dictionary = {}
-
-# 已解锁的结局 id 列表("关卡id:结局id"条目, 结局图鉴与重玩的数据来源)
-var unlocked_endings: Array = []
-
-# 信件墙已生长的节点 id 列表("关卡id:行id"条目; map 场景邮箱生长动画后写入)
-var revealed_nodes: Array = []
-
-# 跨关历史: 本关已达成结局列表 { level_id: [ending_id] }(CURRENT/ELLE 查询、图鉴数据源)
+# —— 存档与只读查询索引 ——
+var save_path := "user://save.json"
+var save_data: Dictionary = {}
 var history: Dictionary = {}
-
-# 已读行记录 { level_id: [row_index] }(READ 函数查询)
 var read_rows: Dictionary = {}
-
-# 已点进过的关卡 id 列表(回顾页「开始!」按钮判定: 非首次进入该关卡)
-var entered_levels: Array = []
-
-# 本次点进是否为该关卡的首次进入(地图点进时写入, 回顾页读取; 瞬态, 不存档)
-var first_entry_level: bool = false
-
-# S 评级记录 { level_id: true }(SRANK 函数查询)
 var sranks: Dictionary = {}
-
-# 累计声望(REP 跨关累积)
-var total_rep: int = 0
+var unlocked_endings: Array = []
+var revealed_nodes: Array = []
+var entered_levels: Array = []
+var total_rep := 0
+var last_save_error: Error = OK
+var recovered_from_backup := false
+var _load_failed := false
 
 func _ready() -> void:
 	load_game()
-	# 从关卡索引取起始关卡; 信件墙建好后, 由玩家选择改写 current_level_id
-	var index := LevelData.load_index()
-	current_level_id = String(index.get("start", "0001"))
+	current_level_id = String(LevelData.load_index().get("start", "0001"))
 
-# —— 数据访问接口 ——
-
-# 当前关卡数据文件路径(每关一个 JSON)
 func current_level_path() -> String:
 	return LEVEL_DIR + current_level_id + ".json"
 
-# —— 阅读流程 ——
+func new_save() -> Dictionary:
+	return {
+		"version": Store.VERSION, "levels": {}, "rows": {}, "story_flags": [], "achievements": [],
+		"documents": [], "album": [], "profiles": [], "entered_levels": [], "total_rep": 0,
+	}
 
-# 记录一行已读(read_rows: { level_id: [行索引] }, READ() 查询与阅读流程共用)
-func mark_row_read(row_id: String) -> void:
-	var level := LevelData.load_level(current_level_id)
-	var idx := -1
-	for i in level.rows.size():
-		if String(level.rows[i].id) == row_id:
-			idx = i
-			break
-	if idx < 0:
-		return
-	var list: Array = read_rows.get(current_level_id, [])
-	if not list.has(idx):
-		list.append(idx)
-	read_rows[current_level_id] = list
+# 修改某行前从这里取条目，默认值会写回存档。
+func row(key: String) -> Dictionary:
+	if not save_data.has("rows"):
+		save_data = new_save()
+	if not save_data.rows.has(key):
+		save_data.rows[key] = {"read": false, "achieved": [], "current": "", "rep": 0, "revealed": false}
+	return save_data.rows[key]
 
-# 记录一次"点进关卡": 返回是否首次进入(地图场景点块进读信时调用)
+func row_read(key: String) -> bool:
+	return bool(save_data.get("rows", {}).get(key, {}).get("read", false))
+
+func row_revealed(key: String) -> bool:
+	return bool(save_data.get("rows", {}).get(key, {}).get("revealed", false))
+
+# 地图解锁与结局判定共用，CURRENT / READ 等直接查询行存档。
+func world_state() -> Dictionary:
+	return {"rows": save_data.get("rows", {}), "sranks": sranks,
+		"stories": save_data.get("story_flags", []), "achievements": save_data.get("achievements", [])}
+
 func mark_level_entered(level_id: String) -> bool:
 	if entered_levels.has(level_id):
 		return false
-	entered_levels.append(level_id)
+	save_data["entered_levels"].append(level_id)
 	save_game()
 	return true
 
-# 本关尚未读过的下一行 id(从 after_row_id 之后开始找; 全部读完返回 "")
-func next_unread_row(after_row_id: String) -> String:
-	var level := LevelData.load_level(current_level_id)
-	var start := -1
-	for i in level.rows.size():
-		if String(level.rows[i].id) == after_row_id:
-			start = i
-			break
-	var list: Array = read_rows.get(current_level_id, [])
-	for i in range(start + 1, level.rows.size()):
-		if not list.has(i):
-			return String(level.rows[i].id)
-	return ""
+func mark_row_read(row_id: String) -> void:
+	if LevelData.load_level(current_level_id).row_by_id(row_id) != null:
+		set_row_read("%s:%s" % [current_level_id, row_id])
 
-# —— 序列化(存档 = dump 本对象, 读档 = 反向恢复) ——
-
-func to_dict() -> Dictionary:
-	return {
-		"current_level_id": current_level_id,
-		"current_row": current_row,
-		"sequences": sequences,
-		"sequences_level": sequences_level,
-		"verdicts": verdicts,
-		"unlocked_endings": unlocked_endings,
-		"revealed_nodes": revealed_nodes,
-		"history": history,
-		"read_rows": read_rows,
-		"entered_levels": entered_levels,
-		"sranks": sranks,
-		"total_rep": total_rep,
-	}
-
-func from_dict(data: Dictionary) -> void:
-	current_level_id = String(data.get("current_level_id", "0001"))
-	current_row = String(data.get("current_row", "L"))
-	sequences = data.get("sequences", {})
-	sequences_level = String(data.get("sequences_level", ""))
-	verdicts = data.get("verdicts", {})
-	unlocked_endings = data.get("unlocked_endings", [])
-	revealed_nodes = data.get("revealed_nodes", [])
-	history = data.get("history", {})
-	read_rows = data.get("read_rows", {})
-	entered_levels = data.get("entered_levels", [])
-	sranks = data.get("sranks", {})
-	total_rep = int(data.get("total_rep", 0))
-
-# —— 存档(选关判定链与存档数据结构-Godot实现 §3.3) ——
-# rows 主表: { "关卡:行": {read, achieved, current, rep, revealed} } + 收集项;
-# 双槽 JSON(对应原版 gamedata00/01): 写前旧档改名 .bak 备份
-var save_path := "user://save.json"
-var save_data: Dictionary = {}
-
-func new_save() -> Dictionary:
-	return {
-		"rows": {},
-		"story_flags": [],
-		"achievements": [],
-		"documents": [],
-		"album": [],
-		"profiles": [],
-		"entered_levels": [],
-		"total_rep": 0,
-	}
-
-# 一行(节点)的存档条目, 缺省创建
-func row(key: String) -> Dictionary:
-	var rows: Dictionary = save_data.get("rows", {})
-	if not rows.has(key):
-		rows[key] = {"read": false, "achieved": [], "current": "", "rep": 0, "revealed": false}
-	return rows[key]
-
-func row_read(key: String) -> bool:
-	return bool(row(key).get("read", false))
-
-func row_revealed(key: String) -> bool:
-	return bool(row(key).get("revealed", false))
-
-func save_game() -> void:
-	var rows: Dictionary = save_data.get("rows", {})
-	for key in rows:
-		rows[key]["achieved"] = history.get(String(key).split(":")[0], [])
-	save_data["total_rep"] = total_rep
-	save_data["entered_levels"] = entered_levels
-	var bak := save_path.get_basename() + ".bak.json"
-	if FileAccess.file_exists(save_path):
-		var d := DirAccess.open("user://")
-		if d != null:
-			if d.file_exists(bak):
-				d.remove(bak)
-			d.rename(save_path.get_file(), bak)
-	var f := FileAccess.open(save_path, FileAccess.WRITE)
-	if f != null:
-		f.store_string(JSON.stringify(save_data, "\t"))
-		f.close()
-
-func load_game() -> void:
-	if not FileAccess.file_exists(save_path):
-		save_data = new_save()
-		return
-	var data = JSON.parse_string(FileAccess.get_file_as_string(save_path))
-	if not (data is Dictionary):
-		save_data = new_save()
-		return
-	save_data = data
-	# 从 rows 恢复兼容字段(其他场景读 history/read_rows/sranks/revealed_nodes)
-	history.clear()
-	read_rows.clear()
-	sranks.clear()
-	revealed_nodes.clear()
-	var rows: Dictionary = save_data.get("rows", {})
-	for key in rows:
-		var r: Dictionary = rows[key]
-		var parts := String(key).split(":")
-		var lv := parts[0]
-		var idx := ["L", "R", "M"].find(parts[1] if parts.size() > 1 else "L")
-		for rk in r.get("achieved", []):
-			var got: Array = history.get(lv, [])
-			if not got.has(rk):
-				got.append(rk)
-				history[lv] = got
-		if r.get("read", false) and idx >= 0:
-			var rd: Array = read_rows.get(lv, [])
-			if not rd.has(idx):
-				rd.append(idx)
-				read_rows[lv] = rd
-		if r.get("revealed", false):
-			revealed_nodes.append(key)
-	total_rep = int(save_data.get("total_rep", 0))
-	entered_levels = save_data.get("entered_levels", [])
-
-# 取信 = 标记该行已读(新信件消失)并落盘(判定链文档 §4.3 第6步)
 func set_row_read(key: String) -> void:
 	row(key)["read"] = true
-	var parts := String(key).split(":")
-	var idx := ["L", "R", "M"].find(parts[1] if parts.size() > 1 else "L")
-	if idx >= 0:
-		var rd: Array = read_rows.get(parts[0], [])
-		if not rd.has(idx):
-			rd.append(idx)
-			read_rows[parts[0]] = rd
 	save_game()
 
-# 节点生长 = 标记 revealed(动画只播一次, 重进地图直接呈现)并落盘(§4.3 第4步)
 func set_row_revealed(key: String) -> void:
 	row(key)["revealed"] = true
-	if not revealed_nodes.has(key):
-		revealed_nodes.append(key)
 	save_game()
 
-# 测试/新游戏: 清空内存与磁盘存档
+func next_unread_row(after_row_id: String) -> String:
+	var level := LevelData.load_level(current_level_id)
+	var after := after_row_id.is_empty()
+	for letter in level.rows:
+		if after and not row_read("%s:%s" % [current_level_id, letter.id]):
+			return letter.id
+		if letter.id == after_row_id:
+			after = true
+	return ""
+
+# 判定引擎只计算结果；进度、声望、排列统一在此保存。
+func record_verdict(level: LevelData, result: Dictionary, arrangement: Dictionary) -> bool:
+	var previous_save := save_data.duplicate(true)
+	var awarded := 0
+	var any_new := false
+	var legacy_new: bool = not history.get(level.level_id, []).has(result.get("ending_id", ""))
+	for letter in level.rows:
+		var item: Dictionary = result.get("rows", {}).get(letter.id, result)
+		var ending_id := String(item.ending_id)
+		var entry := row("%s:%s" % [level.level_id, letter.id])
+		var achieved: Array = entry.get("achieved", []).duplicate()
+		var is_new: bool = not achieved.has(ending_id) if level.has_row_endings() else legacy_new
+		item["is_new"] = is_new
+		item["awarded_rep"] = int(item.rep) if is_new else 0
+		any_new = any_new or is_new
+		if level.has_row_endings():
+			awarded += int(item.awarded_rep)
+		achieved.erase(ending_id)
+		achieved.append(ending_id)
+		entry.merge({"achieved": achieved, "current": ending_id, "rep": int(item.rep)}, true)
+		entry.erase("sequence")
+	if not level.has_row_endings():
+		awarded = int(result.rep) if legacy_new else 0
+	# 排列属于整关，仅保存一份；每行历史和当前结局独立保存。
+	save_data.get_or_add("levels", {})[level.level_id] = {"sequence": arrangement.duplicate(true)}
+	save_data["total_rep"] = int(save_data.get("total_rep", 0)) + awarded
+	result["is_new"] = any_new
+	result["awarded_rep"] = awarded
+	if not save_game():
+		save_data = previous_save
+		_rebuild_indexes()
+		return false
+	verdicts = result
+	sequences = arrangement.duplicate(true)
+	sequences_level = level.level_id
+	session.phase = Session.Phase.DECIDING
+	return true
+
+func row_history(key: String) -> Array:
+	return save_data.get("rows", {}).get(key, {}).get("achieved", []).duplicate()
+
+func retry_arrangement() -> void:
+	verdicts = {}
+	review_letter = false
+	review_queue = []
+	session.phase = Session.Phase.ARRANGING
+
+func reset_arrangement() -> void:
+	sequences = {}
+	sequences_level = ""
+
+func begin_review(rows: Array) -> void:
+	review_queue = rows.duplicate()
+	review_letter = not rows.is_empty()
+	if review_letter:
+		current_row = String(rows[0])
+	session.phase = Session.Phase.REVIEWING if review_letter else Session.Phase.RESULT
+
+func advance_review() -> bool:
+	if not review_queue.is_empty():
+		review_queue.pop_front()
+	begin_review(review_queue)
+	return review_letter
+
+func enter_level(level_id: String, row_id: String) -> void:
+	_clear_session()
+	current_level_id = level_id
+	current_row = row_id
+	first_entry_level = mark_level_entered(level_id)
+
+func save_game() -> bool:
+	if not Store.is_valid(save_data):
+		last_save_error = ERR_INVALID_DATA
+		push_warning("进度结构不合法，未覆盖磁盘存档。")
+		return false
+	_rebuild_indexes()
+	if _load_failed:
+		last_save_error = ERR_FILE_CORRUPT
+		push_warning("存档和备份均无法读取，已保留原文件；修复存档或明确新建游戏后再保存。")
+		return false
+	save_data["version"] = Store.VERSION
+	last_save_error = Store.write_save(save_path, save_data)
+	if last_save_error != OK:
+		push_warning("保存失败（%s）：%s" % [error_string(last_save_error), save_path])
+	return last_save_error == OK
+
+func load_game() -> void:
+	var loaded := Store.read_save(save_path)
+	_load_failed = loaded.failed
+	recovered_from_backup = loaded.recovered
+	save_data = new_save()
+	# 用默认值补齐旧档缺少的字段，保留原进度和未知字段。
+	save_data.merge(loaded.data, true)
+	save_data["version"] = Store.VERSION
+	_clear_session()
+	_rebuild_indexes()
+	last_save_error = ERR_FILE_CORRUPT if _load_failed else OK
+	if recovered_from_backup:
+		push_warning("主存档不可用，已从备份恢复进度。")
+	elif _load_failed:
+		push_warning("存档和备份不可用，原文件未改动。")
+
+# 所有查询索引只在这里生成，使读档和保存后的行为一致。
+func _rebuild_indexes() -> void:
+	history = {}
+	read_rows = {}
+	sranks = {}
+	unlocked_endings = []
+	revealed_nodes = []
+	var levels := {}
+	for key in save_data.get("rows", {}):
+		var entry: Dictionary = save_data.rows[key]
+		var parts := String(key).split(":")
+		var level_id := parts[0]
+		var index := ROW_IDS.find(parts[1])
+		if not levels.has(level_id):
+			levels[level_id] = _existing_level(level_id)
+		var level: LevelData = levels[level_id]
+		var achieved: Array = history.get(level_id, [])
+		for ending in entry.get("achieved", []):
+			if not achieved.has(ending):
+				achieved.append(ending)
+				unlocked_endings.append("%s:%s" % [level_id, ending])
+			if level != null and level.has_row_endings():
+				unlocked_endings.append("%s:%s" % [key, ending])
+			if level != null and String(level.endings_for(parts[1]).get(ending, {}).get("rank", "")) == "S":
+				sranks[level_id] = true
+		history[level_id] = achieved
+		if entry.get("read", false):
+			var read: Array = read_rows.get(level_id, [])
+			if not read.has(index):
+				read.append(index)
+			read_rows[level_id] = read
+		if entry.get("revealed", false):
+			revealed_nodes.append(key)
+	# 独立模式的整关 SRANK 要求各行都曾获 S；行级历史仍可单独查询。
+	for level_id in levels:
+		var level: LevelData = levels[level_id]
+		if level == null or not level.has_row_endings():
+			continue
+		var all_s := true
+		for letter in level.rows:
+			var has_s := false
+			for ending in row_history("%s:%s" % [level_id, letter.id]):
+				has_s = has_s or String(level.endings_for(letter.id).get(ending, {}).get("rank", "")) == "S"
+			all_s = all_s and has_s
+		if all_s:
+			sranks[level_id] = true
+		else:
+			sranks.erase(level_id)
+	total_rep = int(save_data.get("total_rep", 0))
+	entered_levels = save_data.get("entered_levels", []).duplicate()
+
+# 旧存档可能含已移除的关卡，保留进度但不反复报告资源不存在。
+func _existing_level(id: String) -> LevelData:
+	if LevelData.overrides.has(id) or FileAccess.file_exists(LEVEL_DIR + id + ".json"):
+		return LevelData.load_level(id)
+	return null
+
+# 地图只负责选择关卡，恢复结果与排列由状态层完成，不再由 UI 拼装。
+func restore_verdict(level_id: String, row_id: String) -> void:
+	var level := LevelData.load_level(level_id)
+	var results := {}
+	for letter in level.rows:
+		var entry := row("%s:%s" % [level_id, letter.id])
+		var current := String(entry.get("current", ""))
+		var achieved: Array = entry.get("achieved", [])
+		if current.is_empty() and not achieved.is_empty():
+			current = String(achieved.back())
+		var endings := level.endings_for(letter.id)
+		if not endings.has(current):
+			continue
+		var ending: Dictionary = endings[current]
+		results[letter.id] = {"level_id": level_id, "ending_id": current,
+			"rank": String(ending.get("rank", "")), "rep": int(ending.get("rep", 0)),
+			"awarded_rep": 0, "is_new": false, "changes": ending.get("change", []).duplicate(true)}
+	if results.is_empty():
+		retry_arrangement()
+		reset_arrangement()
+		return
+	verdicts = {"level_id": level_id, "rows": results, "independent": level.has_row_endings(), "awarded_rep": 0, "is_new": false}
+	if not level.has_row_endings():
+		verdicts.merge(results.get(row_id, results.values()[0]), true)
+	var snapshot: Dictionary = save_data.get("levels", {}).get(level_id, {}).get("sequence", {})
+	session.phase = Session.Phase.RESULT
+	# 兼容只在另一行保存过排列的旧档。
+	if not level.is_valid_arrangement(snapshot):
+		for letter in level.rows:
+			var candidate: Dictionary = row("%s:%s" % [level_id, letter.id]).get("sequence", {})
+			if level.is_valid_arrangement(candidate):
+				snapshot = candidate
+				break
+	# 空数组、旧节点名、改版后缺失的纸条都不能用于恢复。
+	# 只修复排列，不清空历史结局、评级或声望；下次决定时会正常保存新排列。
+	sequences = snapshot.duplicate(true) if level.is_valid_arrangement(snapshot) else level.initial_arrangement()
+	sequences_level = level_id
+
+func _clear_session() -> void:
+	session = Session.new()
+	sequences = {}
+	sequences_level = ""
+	verdicts = {}
+	review_letter = false
+	review_queue = []
+	first_entry_level = false
+	current_row = "L"
+
+# 新游戏或隔离测试使用；调用者必须先选好 save_path。
 func reset_save() -> void:
 	save_data = new_save()
-	history.clear()
-	read_rows.clear()
-	entered_levels.clear()
-	first_entry_level = false
-	sranks.clear()
-	revealed_nodes.clear()
-	unlocked_endings.clear()
-	total_rep = 0
-	if FileAccess.file_exists(save_path):
-		DirAccess.remove_absolute(save_path)
-	var bak := save_path.get_basename() + ".bak.json"
-	if FileAccess.file_exists(bak):
-		DirAccess.remove_absolute(bak)
+	_load_failed = false
+	recovered_from_backup = false
+	last_save_error = OK
+	_clear_session()
+	_rebuild_indexes()
+	for path in [save_path, Store.backup_path(save_path), save_path + ".tmp"]:
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(path)

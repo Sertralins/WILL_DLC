@@ -13,11 +13,43 @@ static func setup(slot: Control, character: String) -> void:
 # 按动画框场景路径直接填槽(关卡 JSON 行级 anim 用; 空路径/不存在 = 清空并隐藏槽)
 static func setup_path(slot: Control, path: String) -> void:
 	for child in slot.get_children():
+		slot.remove_child(child)
 		child.queue_free()
 	if path == "" or not ResourceLoader.exists(path):
 		slot.visible = false
 		return
 	slot.visible = true
-	var anim: Control = (load(path) as PackedScene).instantiate()
+	var scene := load(path) as PackedScene
+	if scene == null:
+		slot.visible = false
+		push_warning("人物动画需要 .tscn 场景：%s" % path)
+		return
+	var instance := scene.instantiate()
+	if not instance is Control:
+		instance.free()
+		slot.visible = false
+		push_warning("人物动画场景根节点需要 Control，用作固定设计画布：%s" % path)
+		return
+	var anim := instance as Control
 	anim.position = Vector2.ZERO
 	slot.add_child(anim)
+	var fit := preload("res://scripts/ui/character_frame_fit.gd").new()
+	anim.add_child(fit)
+	fit.configure(slot, anim)
+
+
+# 只移动场景中配置好的动画槽，不改人物内部动画、缩放或最终落点。
+# from_right=false 从左侧入场；true 从右侧入场。调用方决定哪些流程播放。
+const SLIDE_DURATION := 0.75
+
+static func slide_in(slot: Control, from_right := false) -> Tween:
+	if not slot.visible:
+		return null
+	var destination := slot.position
+	var screen_rect := slot.get_global_rect()
+	var viewport_width := slot.get_viewport_rect().size.x
+	var start_x := viewport_width + 32.0 if from_right else -screen_rect.size.x - 32.0
+	slot.global_position.x = start_x
+	var tween := slot.create_tween()
+	tween.tween_property(slot, "position", destination, SLIDE_DURATION).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	return tween

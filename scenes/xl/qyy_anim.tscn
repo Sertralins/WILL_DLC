@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/qyy_mesh_preview.gd" id="1"]
+
+[node name="QyyAnim" type="Control"]
+custom_minimum_size = Vector2(512, 1024)
+offset_right = 512.0
+offset_bottom = 1024.0
+mouse_filter = 2
+modulate = Color(1, 1, 1, 0.6)
+script = ExtResource("1")

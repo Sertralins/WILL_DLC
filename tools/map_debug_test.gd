@@ -18,7 +18,7 @@ func _ready() -> void:
 func _run() -> void:
 	await get_tree().process_frame
 	for lv in PREP_HISTORY:
-		GameState.history[lv] = (PREP_HISTORY[lv] as Array).duplicate()
+		preload("res://tools/test_fixtures.gd").set_history(lv, (PREP_HISTORY[lv] as Array).duplicate())
 	# 可选: 把目标关之前链上的节点直接标记"已读+已生长",
 	# 这样点目标关的信封时链回溯不会把前面的关卡也演一遍:
 	#   GameState.set_row_read("0001:L")

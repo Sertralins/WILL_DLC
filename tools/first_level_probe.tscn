@@ -1,0 +1,7 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/arrange/arrange_board.tscn" id="1"]
+[ext_resource type="Script" path="res://tools/first_level_probe.gd" id="2"]
+
+[node name="Main" instance=ExtResource("1")]
+script = ExtResource("2")

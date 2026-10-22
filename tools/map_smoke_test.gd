@@ -1,3 +1,4 @@
+# 历史手工探针，依赖旧的 0001 双人 / 0002 数据；自动回归请运行 run_checks.ps1。
 # map_smoke_test.gd — headless 冒烟测试: 邮箱生长 / 剧情线(竖) / 同信齐平+红线(横) / 信息窗 / 解锁求值
 # 运行: godot --headless --path . res://tools/map_smoke_test.tscn (headless 无帧率上限, 用外部 timeout 收尾)
 extends "res://scenes/map/map.gd"
@@ -69,10 +70,10 @@ func _run() -> void:
 			rung_ok = rung_ok and sp.texture.resource_path.get_file() == "connecting_lines_9.png"
 	print("T: rail_anchor_ok=%s rung_red_solid=%s" % [str(anchor_ok), str(rung_ok)])
 	# 通关 0001 (BAD1) → 0002 unlock 通过; 0002 只有 L 行 → 不加红线
-	GameState.history["0001"] = ["BAD1"]
+	preload("res://tools/test_fixtures.gd").set_history("0001", ["BAD1"])
 	_rebuild_previews()
 	print("T: previews_bad1=%d" % previews_layer.get_child_count())   # BAD1 不满足 pendings(S1) → 0
-	GameState.history["0001"] = ["S1"]
+	preload("res://tools/test_fixtures.gd").set_history("0001", ["S1"])
 	_rebuild_previews()
 	# S1 达成 → 0002:L 的待定虚线出现(dotted 素材)
 	var preview_ok := previews_layer.get_child_count() == 1
@@ -83,7 +84,7 @@ func _run() -> void:
 			var sp: Sprite2D = pl.sections[0].seg.get_child(0)
 			preview_ok = sp.texture.resource_path.get_file().begins_with("dotted_")
 	print("T: preview_s1=%s" % str(preview_ok))
-	GameState.history["0001"] = ["BAD1"]
+	preload("res://tools/test_fixtures.gd").set_history("0001", ["BAD1"])
 	_on_mailbox()
 	await get_tree().create_timer(0.4).timeout
 	_on_envelope_click(_pending_envs[0])   # 0002 链: 0001:L 已长过跳过, 只长 0002
@@ -112,7 +113,7 @@ func _run() -> void:
 	print("T: card_0002_h=%d" % int(open_cards[0].size.y))
 	_close_popup()
 	# 达成 S1 → 关联集合不变(红线只由同信关系决定, 与评级无关)
-	GameState.history["0001"] = ["S1"]
+	preload("res://tools/test_fixtures.gd").set_history("0001", ["S1"])
 	_rebuild_rungs()
 	print("T: rungs_after_S1=%d" % rungs_layer.get_child_count())
 	# 跳转读信(放最后: 切场景会释放本节点)

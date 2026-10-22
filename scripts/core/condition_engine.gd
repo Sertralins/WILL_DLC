@@ -3,6 +3,13 @@
 class_name ConditionEngine
 extends RefCounted
 
+# 运行时和校验器共用：参数数目为 [最少, 最多]，-1 表示不限。
+const FUNCTIONS := {
+	"SS": [2, -1], "OS": [2, 2], "OSS": [2, 2], "S": [2, 2],
+	"IN": [2, 2], "CURRENT": [3, 3], "ELLE": [3, -1],
+	"SRANK": [1, 1], "STORY": [1, 1], "READ": [2, 2], "ACHIEVE": [3, 3],
+}
+
 # —— 求值上下文(三表) ——
 # ctx = {
 #   "merged":  Array[String]  — 合并序列: 各行句子 id 按行序拼接的完整顺序
@@ -18,8 +25,19 @@ static func evaluate(expr: String, ctx: Dictionary) -> bool:
 	var tokens := _tokenize(expr)
 	if tokens.is_empty():
 		return false
-	var pos := [0]  # 数组模拟指针(传引用)
-	return _parse_or(tokens, pos, ctx)
+	# pos[0] 是读取位置，pos[1] 记录整条表达式是否仍然合法。
+	var pos := [0, true]
+	var result := _parse_or(tokens, pos, ctx)
+	return result and bool(pos[1]) and pos[0] == tokens.size()
+
+# 只检查语法，不查询游戏进度。与 evaluate 使用完全相同的解析流程。
+static func is_valid_expression(expr: String) -> bool:
+	if expr.strip_edges().is_empty():
+		return true
+	var tokens := _tokenize(expr)
+	var pos := [0, true]
+	_parse_or(tokens, pos, {"validate_only": true})
+	return not tokens.is_empty() and bool(pos[1]) and pos[0] == tokens.size()
 
 # —— 分词 ——
 
@@ -28,7 +46,7 @@ static func _tokenize(expr: String) -> Array:
 	var i := 0
 	while i < expr.length():
 		var c := expr[i]
-		if c == " " or c == "\t":
+		if c in [" ", "\t", "\n", "\r"]:
 			i += 1
 			continue
 		if c == "&" and i + 1 < expr.length() and expr[i + 1] == "&":
@@ -64,7 +82,7 @@ static func _tokenize(expr: String) -> Array:
 			tokens.append({"t": "NUMBER" if _is_digit(word[0]) else "IDENT", "v": word})
 			i = j
 			continue
-		i += 1  # 跳过未知字符
+		return []  # 不能忽略错误，否则 A&B 可能被误读成 A。
 	return tokens
 
 static func _is_digit(s: String) -> bool:
@@ -81,14 +99,16 @@ static func _parse_or(tokens: Array, pos: Array, ctx: Dictionary) -> bool:
 	var value := _parse_and(tokens, pos, ctx)
 	while _peek(tokens, pos, "OR"):
 		pos[0] += 1
-		value = value or _parse_and(tokens, pos, ctx)
+		var right := _parse_and(tokens, pos, ctx)
+		value = value or right  # 先读取右侧，再求值；不能让短路跳过解析。
 	return value
 
 static func _parse_and(tokens: Array, pos: Array, ctx: Dictionary) -> bool:
 	var value := _parse_unary(tokens, pos, ctx)
 	while _peek(tokens, pos, "AND"):
 		pos[0] += 1
-		value = value and _parse_unary(tokens, pos, ctx)
+		var right := _parse_unary(tokens, pos, ctx)
+		value = value and right
 	return value
 
 static func _parse_unary(tokens: Array, pos: Array, ctx: Dictionary) -> bool:
@@ -105,6 +125,7 @@ static func _parse_primary(tokens: Array, pos: Array, ctx: Dictionary) -> bool:
 		return value
 	var tok := _cur(tokens, pos)
 	if tok.get("t", "") != "IDENT":
+		pos[1] = false
 		return false
 	pos[0] += 1
 	# 函数调用: IDENT "(" args ")"
@@ -119,7 +140,12 @@ static func _parse_primary(tokens: Array, pos: Array, ctx: Dictionary) -> bool:
 					continue
 				break
 		_consume(tokens, pos, "RPAREN")
-		return _call(String(tok.get("v", "")), args, ctx)
+		var name := String(tok.get("v", ""))
+		if not _valid_call(name, args):
+			pos[1] = false
+		if not pos[1] or ctx.get("validate_only", false):
+			return false
+		return _call(name, args, ctx)
 	# 裸标识符: 条件句触发状态(未触发 = false)
 	return bool(ctx.get("triggered", {}).get(String(tok.get("v", "")), false))
 
@@ -128,7 +154,20 @@ static func _arg(tokens: Array, pos: Array) -> String:
 	if tok.get("t", "") == "IDENT" or tok.get("t", "") == "NUMBER":
 		pos[0] += 1
 		return String(tok.get("v", ""))
+	pos[1] = false
 	return ""
+
+static func _valid_call(name: String, args: Array) -> bool:
+	if not FUNCTIONS.has(name):
+		return false
+	var limits: Array = FUNCTIONS[name]
+	if args.size() < limits[0] or (limits[1] >= 0 and args.size() > limits[1]):
+		return false
+	if name == "IN":
+		return String(args[0]) in ["L", "R", "M"]
+	if name in ["CURRENT", "ELLE", "READ", "ACHIEVE"]:
+		return String(args[1]) in ["0", "1", "2"]
+	return true
 
 # —— 函数求值 ——
 
@@ -196,20 +235,18 @@ static func _positions(ctx: Dictionary) -> Dictionary:
 		map[String(merged[i])] = i
 	return map
 
-# —— 跨关函数(世界状态查询; 数据由 RuleEngine 写入 GameState, 阶段 E 随多关接入) ——
-# 注: 本作结局是关卡级(无行级), CURRENT/ELLE 的行号参数暂时忽略, 只查"本关达成过哪些结局"
+# —— 跨关函数：CURRENT 查当前，ELLE / ACHIEVE 查历史，行号 0/1/2 = L/R/M ——
 static func _eval_world(name: String, args: Array, ctx: Dictionary) -> bool:
 	var world: Dictionary = ctx.get("world_state", {})
+	var entry: Dictionary = {}
+	if name in ["CURRENT", "ELLE", "READ", "ACHIEVE"]:
+		var key := "%s:%s" % [args[0], ["L", "R", "M"][int(String(args[1]))]]
+		entry = world.get("rows", {}).get(key, {})
 	match name:
 		"CURRENT":
-			if args.size() < 3:
-				return false
-			var got: Array = world.get("history", {}).get(String(args[0]), [])
-			return got.has(String(args[2]))
-		"ELLE":
-			if args.size() < 3:
-				return false
-			var got2: Array = world.get("history", {}).get(String(args[0]), [])
+			return String(entry.get("current", "")) == String(args[2])
+		"ELLE", "ACHIEVE":
+			var got2: Array = entry.get("achieved", [])
 			for a in args.slice(2):
 				if got2.has(String(a)):
 					return true
@@ -219,15 +256,7 @@ static func _eval_world(name: String, args: Array, ctx: Dictionary) -> bool:
 		"STORY":
 			return (world.get("stories", []) as Array).has(String(args[0]))
 		"READ":
-			if args.size() < 2:
-				return false
-			var rows: Array = world.get("read", {}).get(String(args[0]), [])
-			return rows.has(int(String(args[1])))
-		"ACHIEVE":
-			var key := ""
-			for a in args:
-				key += String(a) + ","
-			return bool(world.get("achievements", {}).get(key, false))
+			return bool(entry.get("read", false))
 	return false
 
 # —— 工具 ——
@@ -243,3 +272,5 @@ static func _peek(tokens: Array, pos: Array, kind: String) -> bool:
 static func _consume(tokens: Array, pos: Array, kind: String) -> void:
 	if _peek(tokens, pos, kind):
 		pos[0] += 1
+	else:
+		pos[1] = false

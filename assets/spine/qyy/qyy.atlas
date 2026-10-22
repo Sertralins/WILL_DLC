@@ -1,0 +1,12 @@
+qyy.png
+size: 512, 1024
+format: RGBA8888
+filter: Linear, Linear
+repeat: none
+qyy
+  rotate: false
+  xy: 0, 0
+  size: 512, 1024
+  orig: 512, 1024
+  offset: 0, 0
+  index: -1

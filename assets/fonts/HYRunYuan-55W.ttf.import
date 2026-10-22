@@ -30,7 +30,13 @@ Fallbacks=null
 fallbacks=[]
 Compress=null
 compress=true
-preload=[]
+preload=[{
+"chars": [],
+"glyphs": [],
+"name": "新建配置",
+"size": Vector2i(16, 0),
+&"variation_embolden": -0.41999999999999993
+}]
 language_support={}
 script_support={}
 opentype_features={}

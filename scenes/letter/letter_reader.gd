@@ -11,9 +11,9 @@ const TITLE_FONT_SIZE := 100        # Panel0 标题字号(可调; 正文 42, 标
 # 行高 = 42 × 1.2 = 50.4px, 也就是上下两行的字方块之间留 0.2 × 42 = 8.4px 空隙。
 # 注意字体在 42px 下的自然高度是 52px(上高 39 + 下深 13), 比行高还大一点点,
 # 但中文墨迹只有约 36px, 按字方块算行距才符合设计稿, 也不会裁到字。
-const LETTER_FONT := preload("res://assets/fonts/HYRunYuan-55W.ttf")
+const LETTER_FONT := preload("res://assets/fonts/HYRunYuan-45J.ttf")
 const TITLE_FONT := preload("res://assets/fonts/KaiTi.ttf")   # 标题字体: 楷体(正楷)
-const FONT_SIZE := 42
+const FONT_SIZE := 48
 const MARKER_FONT_SIZE := 30
 const LINE_HEIGHT := FONT_SIZE * 1.1  # (含行距), 同时用于超页检测
 const PAPER_CONTENT_HEIGHT := 667.0   # 信纸文字区可用高度,超出时告警(现已有自动拆页兜底)
@@ -46,6 +46,7 @@ var _title_tween: Tween
 @onready var anim_slot: Control = $SilhouetteLayer/AnimSlot
 
 func _ready() -> void:
+	GameState.session.phase = GameState.Session.Phase.REVIEWING if GameState.review_letter else GameState.Session.Phase.READING
 	start_button.visible = false
 	start_button.pressed.connect(_on_start_button_pressed)
 	_bind_character_background()
@@ -97,6 +98,10 @@ func _bind_character_anim() -> void:
 		CharacterAnim.setup_path(anim_slot, row.anim)
 	else:
 		CharacterAnim.setup(anim_slot, String(row.character))
+	# 读信首次展示和决定后的信件演出均滑入；三人规则暂不处理。
+	if level.row_count in [1, 2]:
+		var from_right := level.row_count == 2 and row == level.rows[1]
+		CharacterAnim.slide_in(anim_slot, from_right)
 # 普通模式: 信件 = 当前行(GameState.current_row)的初始句子序列(首固定块 → 字条 → 其余固定块);
 # 重排后阅览模式(review_letter): 信件 = 该行当前的排列序列, 从第二个元素(第一张字条)开始逐句展示(顶部固定黑块是开场框架, 不重放)
 func _load_letter() -> void:
@@ -118,13 +123,15 @@ func _load_letter() -> void:
 			for s in r.strips:
 				strip_ids[String(s.get("id", ""))] = true
 		var seq: Array = GameState.sequences.get(row.id, [])
+		var replacements: Dictionary = level.change_maps(level.changes_for(GameState.verdicts, GameState.current_row)).replace
 		var filtered: Array = []
 		for id in seq:
-			if not strip_ids.has(String(id)):
+			# 固定开场不重放；被替换的字条也要展示新的正文。
+			if not row.blocks.is_empty() and id == row.blocks[0].get("id", ""):
+				continue
+			if not strip_ids.has(String(id)) or replacements.has(String(id)):
 				filtered.append(String(id))
-		if filtered.size() > 1:
-			filtered = filtered.slice(1)
-		raw_pages = level.apply_changes(filtered, GameState.verdicts.get("changes", []))
+		raw_pages = level.apply_changes(filtered, level.changes_for(GameState.verdicts, GameState.current_row))
 	else:
 		# 首次阅读标题(只普通模式有, 重排阅览无):
 		# 行级 title_block 模块优先(text/text_key, 标题在首页演出);
@@ -371,13 +378,9 @@ func _finish_reading() -> void:
 # 普通阅读: 记录本行已读 → 进入回顾页(另一封/回想/返回/开始! 由回顾页接管)
 func _on_start_button_pressed() -> void:
 	if GameState.review_letter:
-		GameState.review_letter = false
-		GameState.review_queue.pop_front()
-		if GameState.review_queue.is_empty():
+		if not GameState.advance_review():
 			GameFlow.goto("arrange")
 			return
-		GameState.current_row = String(GameState.review_queue[0])
-		GameState.review_letter = true
 		GameFlow.goto("letter")
 		return
 	GameState.mark_row_read(GameState.current_row)
